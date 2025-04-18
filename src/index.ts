@@ -32,9 +32,50 @@ async function main() {
     
     // Start the server with HTTP transport
     const transport = new StreamableHTTPServerTransport({
-      sessionIdGenerator: () => randomUUID(),
-      path: '/',
-      expressApp: app
+      sessionIdGenerator: () => randomUUID()
+    });
+
+    // Set up routes for the transport
+    app.use('/', (req, res, next) => {
+      if (req.method === 'GET') {
+        // Handle SSE connections
+        res.setHeader('Content-Type', 'text/event-stream');
+        res.setHeader('Cache-Control', 'no-cache');
+        res.setHeader('Connection', 'keep-alive');
+        
+        // Send initial connection message
+        res.write('event: connected\ndata: {}\n\n');
+        
+        // Keep the connection alive
+        const keepAliveInterval = setInterval(() => {
+          res.write(': keepalive\n\n');
+        }, 30000);
+        
+        // Clean up on close
+        res.on('close', () => {
+          clearInterval(keepAliveInterval);
+        });
+      } else if (req.method === 'POST') {
+        // Handle incoming messages
+        let body = '';
+        req.on('data', chunk => {
+          body += chunk.toString();
+        });
+        
+        req.on('end', async () => {
+          try {
+            const message = JSON.parse(body);
+            // Process the message (in a real implementation, this would be handled by the transport)
+            console.log('Received message:', message);
+            res.status(200).end();
+          } catch (error) {
+            console.error('Error processing message:', error);
+            res.status(400).json({ error: 'Invalid message format' });
+          }
+        });
+      } else {
+        next();
+      }
     });
 
     // Start HTTP server
