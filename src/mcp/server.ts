@@ -2,6 +2,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { RollbarClient } from '../api/rollbar-client.js';
 import { config } from '../config.js';
+import { EventEmitter } from 'events';
 
 /**
  * Create and configure the Rollbar MCP server
@@ -15,7 +16,7 @@ export function createRollbarMcpServer() {
     name: 'Rollbar',
     version: '0.1.0',
     description: 'MCP server for Rollbar error tracking',
-  });
+  }) as McpServer & EventEmitter;
 
   // Add logging for connection events
   server.on('connect', () => {
@@ -26,19 +27,19 @@ export function createRollbarMcpServer() {
     console.log('MCP server disconnected from transport');
   });
 
-  server.on('error', (error) => {
+  server.on('error', (error: Error) => {
     console.error('MCP server error:', error);
   });
 
-  server.on('session:start', (sessionId) => {
+  server.on('session:start', (sessionId: string) => {
     console.log(`New session started: ${sessionId}`);
   });
 
-  server.on('session:end', (sessionId) => {
+  server.on('session:end', (sessionId: string) => {
     console.log(`Session ended: ${sessionId}`);
   });
 
-  server.on('tool:call', (sessionId, toolName, params) => {
+  server.on('tool:call', (sessionId: string, toolName: string, params: unknown) => {
     console.log(`Tool call in session ${sessionId}: ${toolName}`, params);
   });
 

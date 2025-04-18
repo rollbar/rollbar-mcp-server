@@ -33,8 +33,12 @@ async function main() {
     // Start the server with HTTP transport
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: () => randomUUID(),
-      path: '/',
-      expressApp: app
+      enableJsonResponse: false
+    });
+
+    // Set up the Express route to handle MCP requests
+    app.all('*', (req, res) => {
+      transport.handleRequest(req, res);
     });
 
     // Start HTTP server
