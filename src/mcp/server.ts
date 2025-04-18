@@ -11,42 +11,56 @@ export function createRollbarMcpServer() {
   // Create the Rollbar API client
   const rollbarClient = new RollbarClient(config.rollbarAccessToken);
 
+  // Create an EventEmitter for handling events
+  const emitter = new EventEmitter();
+  
   // Create the MCP server
   const server = new McpServer({
     name: 'Rollbar',
     version: '0.1.0',
     description: 'MCP server for Rollbar error tracking',
-  }) as McpServer & EventEmitter;
+  });
+
+  // Create a wrapper object that includes both the server and event emitter
+  const serverWithEvents = {
+    ...server,
+    connect: server.connect.bind(server),
+    on: emitter.on.bind(emitter),
+    once: emitter.once.bind(emitter),
+    emit: emitter.emit.bind(emitter),
+    removeListener: emitter.removeListener.bind(emitter),
+    tool: server.tool.bind(server),
+  };
 
   // Add logging for connection events
-  server.on('connect', () => {
+  serverWithEvents.on('connect', () => {
     console.log('MCP server connected to transport');
   });
 
-  server.on('disconnect', () => {
+  serverWithEvents.on('disconnect', () => {
     console.log('MCP server disconnected from transport');
   });
 
-  server.on('error', (error: Error) => {
+  serverWithEvents.on('error', (error: Error) => {
     console.error('MCP server error:', error);
   });
 
-  server.on('session:start', (sessionId: string) => {
+  serverWithEvents.on('session:start', (sessionId: string) => {
     console.log(`New session started: ${sessionId}`);
   });
 
-  server.on('session:end', (sessionId: string) => {
+  serverWithEvents.on('session:end', (sessionId: string) => {
     console.log(`Session ended: ${sessionId}`);
   });
 
-  server.on('tool:call', (sessionId: string, toolName: string, params: unknown) => {
+  serverWithEvents.on('tool:call', (sessionId: string, toolName: string, params: unknown) => {
     console.log(`Tool call in session ${sessionId}: ${toolName}`, params);
   });
 
   // Add tools for interacting with Rollbar
 
   // List projects
-  server.tool(
+  serverWithEvents.tool(
     'list-projects',
     {},
     async () => {
@@ -84,7 +98,7 @@ export function createRollbarMcpServer() {
   );
 
   // Get project details
-  server.tool(
+  serverWithEvents.tool(
     'get-project',
     { projectId: z.number() },
     async ({ projectId }) => {
@@ -114,7 +128,7 @@ export function createRollbarMcpServer() {
   );
 
   // List items (errors) for a project
-  server.tool(
+  serverWithEvents.tool(
     'list-items',
     {
       projectId: z.number(),
@@ -169,7 +183,7 @@ export function createRollbarMcpServer() {
   );
 
   // Get item details
-  server.tool(
+  serverWithEvents.tool(
     'get-item',
     { itemId: z.number() },
     async ({ itemId }) => {
@@ -199,7 +213,7 @@ export function createRollbarMcpServer() {
   );
 
   // Get occurrences for an item
-  server.tool(
+  serverWithEvents.tool(
     'get-item-occurrences',
     {
       itemId: z.number(),
@@ -249,7 +263,7 @@ export function createRollbarMcpServer() {
   );
 
   // Get occurrence details
-  server.tool(
+  serverWithEvents.tool(
     'get-occurrence',
     {
       itemId: z.number(),
@@ -282,7 +296,7 @@ export function createRollbarMcpServer() {
   );
 
   // Update item status
-  server.tool(
+  serverWithEvents.tool(
     'update-item-status',
     {
       itemId: z.number(),
@@ -315,7 +329,7 @@ export function createRollbarMcpServer() {
   );
 
   // Search for items
-  server.tool(
+  serverWithEvents.tool(
     'search-items',
     {
       projectId: z.number(),
@@ -374,5 +388,5 @@ export function createRollbarMcpServer() {
     }
   );
 
-  return server;
+  return serverWithEvents;
 }
