@@ -17,6 +17,31 @@ export function createRollbarMcpServer() {
     description: 'MCP server for Rollbar error tracking',
   });
 
+  // Add logging for connection events
+  server.on('connect', () => {
+    console.log('MCP server connected to transport');
+  });
+
+  server.on('disconnect', () => {
+    console.log('MCP server disconnected from transport');
+  });
+
+  server.on('error', (error) => {
+    console.error('MCP server error:', error);
+  });
+
+  server.on('session:start', (sessionId) => {
+    console.log(`New session started: ${sessionId}`);
+  });
+
+  server.on('session:end', (sessionId) => {
+    console.log(`Session ended: ${sessionId}`);
+  });
+
+  server.on('tool:call', (sessionId, toolName, params) => {
+    console.log(`Tool call in session ${sessionId}: ${toolName}`, params);
+  });
+
   // Add tools for interacting with Rollbar
 
   // List projects

@@ -4,6 +4,8 @@ import { createRollbarMcpServer } from './mcp/server.js';
 import { config } from './config.js';
 import { createServer } from 'http';
 import { randomUUID } from 'crypto';
+import cors from 'cors';
+import express from 'express';
 
 async function main() {
   // Create the Rollbar MCP server
@@ -14,17 +16,25 @@ async function main() {
   const transportType = args[0] || 'stdio';
 
   if (transportType === 'http') {
+    // Create Express app
+    const app = express();
+    
+    // Enable CORS for all routes
+    app.use(cors({
+      origin: '*',
+      methods: ['GET', 'POST', 'OPTIONS'],
+      allowedHeaders: ['Content-Type', 'Authorization'],
+      credentials: true
+    }));
+    
     // Create HTTP server
-    const httpServer = createServer();
+    const httpServer = createServer(app);
     
     // Start the server with HTTP transport
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: () => randomUUID(),
-    });
-
-    // Configure HTTP server to use the transport
-    httpServer.on('request', (req, res) => {
-      transport.handleRequest(req, res);
+      path: '/',
+      expressApp: app
     });
 
     // Start HTTP server
