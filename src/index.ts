@@ -1,7 +1,9 @@
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { HttpServerTransport } from '@modelcontextprotocol/sdk/server/http.js';
+import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { createRollbarMcpServer } from './mcp/server.js';
 import { config } from './config.js';
+import { createServer } from 'http';
+import { randomUUID } from 'crypto';
 
 async function main() {
   // Create the Rollbar MCP server
@@ -12,12 +14,24 @@ async function main() {
   const transportType = args[0] || 'stdio';
 
   if (transportType === 'http') {
+    // Create HTTP server
+    const httpServer = createServer();
+    
     // Start the server with HTTP transport
-    const transport = new HttpServerTransport({
-      port: config.port,
+    const transport = new StreamableHTTPServerTransport({
+      sessionIdGenerator: () => randomUUID(),
     });
 
-    console.log(`Starting Rollbar MCP server with HTTP transport on port ${config.port}...`);
+    // Configure HTTP server to use the transport
+    httpServer.on('request', (req, res) => {
+      transport.handleRequest(req, res);
+    });
+
+    // Start HTTP server
+    httpServer.listen(config.port, () => {
+      console.log(`Starting Rollbar MCP server with HTTP transport on port ${config.port}...`);
+    });
+
     await server.connect(transport);
     console.log(`Rollbar MCP server is running on http://localhost:${config.port}`);
   } else {
