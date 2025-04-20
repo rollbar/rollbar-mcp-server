@@ -194,17 +194,7 @@ server.tool(
       // Combine item and occurrence data
       const responseData = {
         ...formattedData,
-        occurrence: {
-          id: occurrence.id,
-          timestamp: occurrence.timestamp,
-          data: {
-            context: occurrence.data.context,
-            code_version: occurrence.data.code_version,
-            request: occurrence.data.request,
-            exception: occurrence.data.exception,
-            stack_trace: occurrence.data.stack_trace
-          }
-        }
+        occurrence: occurrence
       };
 
       return {
