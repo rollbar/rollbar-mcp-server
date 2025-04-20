@@ -153,24 +153,8 @@ server.tool(
       
       const item = itemResponse.result;
       
-      // Format the response as JSON string
-      const formattedData = {
-        id: item.id,
-        project_id: item.project_id,
-        counter: item.counter,
-        title: item.title,
-        level: item.level,
-        environment: item.environment,
-        last_occurrence_timestamp: item.last_occurrence_timestamp,
-        last_occurrence_id: item.last_occurrence_id,
-        language: item.language,
-        platform: item.platform,
-        framework: item.framework,
-        hash: item.hash,
-        exception: item.exception,
-        request: item.request,
-        body: item.body
-      };
+      // Use the complete item data
+      const formattedData = item;
 
       const occurrenceUrl = `${ROLLBAR_API_BASE}/instance/${item.last_occurrence_id}`;
       console.error(`Fetching occurrence details from: ${occurrenceUrl}`);
