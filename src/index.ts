@@ -7,11 +7,11 @@ import dotenv from "dotenv";
 dotenv.config();
 
 const ROLLBAR_API_BASE = "https://api.rollbar.com/api/1";
-const USER_AGENT = "rollbar-mcp/0.0.1";
+const USER_AGENT = "rollbar-mcp-server/0.0.1";
 const ROLLBAR_ACCESS_TOKEN = process.env.ROLLBAR_ACCESS_TOKEN;
 
 if (!ROLLBAR_ACCESS_TOKEN) {
-  console.error("Error: ROLLBAR_ACCESS_TOKEN is not set in .env file");
+  console.error("Error: ROLLBAR_ACCESS_TOKEN is not set in env var or .env file");
   process.exit(1);
 }
 
