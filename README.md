@@ -1,8 +1,20 @@
 # rollbar-mcp-server
 
-An initial Model Context Protocl (MCP) server for Rollbar. This implementation is designed for the `stdio` mode, which means your AI tool (e.g. Claude) will run it directly; you don't run a separate process.
+An initial Model Context Protocl (MCP) server for [Rollbar](https://rollbar.com).
 
-## Usage
+## Features
+
+This MCP server implementes the `stdio` server type, which means your AI tool (e.g. Claude) will run it directly; you don't run a separate process.
+
+### Configuration
+
+`ROLLBAR_ACCESS_TOKEN`: a `read`-scope access token for your Rollbar project.
+
+### Tools
+
+`get-item-details(counter)`: Given an item number, fetch the item details and last occurrence details. Example prompt: `Diagnose the root cause of Rollbar item #123456`
+
+## How to Use
 
 Tested with node 22 (`nvm use 22`).
 
@@ -33,7 +45,7 @@ Configure your `.mcp.json` as follows:
 ```
 
 
-## Development
+## How to Develop
 
 Install and build:
 
