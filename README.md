@@ -1,6 +1,9 @@
 # rollbar-mcp-server
 
-An initial Model Context Protocl (MCP) server for [Rollbar](https://rollbar.com).
+A Model Context Protocl (MCP) server for [Rollbar](https://rollbar.com).
+
+> [!NOTE]
+> This software is pre-release, alpha quality, and under active development.
 
 ## Features
 
@@ -25,6 +28,8 @@ npm install
 npm run build
 ```
 
+### Claude Code
+
 Configure your `.mcp.json` as follows:
 
 ```
@@ -32,7 +37,7 @@ Configure your `.mcp.json` as follows:
   "mcpServers": {
     "rollbar": {
       "type": "stdio",
-      "command": "/node",
+      "command": "node",
       "args": [
         "/ABSOLUTE/PATH/TO/rollbar-mcp-server/build/index.js"
       ],
@@ -44,6 +49,26 @@ Configure your `.mcp.json` as follows:
 }
 ```
 
+### VS Code
+
+Configure your `.vscode/mcp.json` as follows:
+
+```
+{
+  "servers": {
+    "rollbar": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "/ABSOLUTE/PATH/TO/rollbar-mcp-server/build/index.js"
+      ],
+      "env": {
+        "ROLLBAR_ACCESS_TOKEN": "<project read access token>"
+      }
+    }
+  }
+}
+```
 
 ## How to Develop
 
