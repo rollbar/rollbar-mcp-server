@@ -95,7 +95,9 @@ interface RollbarItemResponse {
       message: string;
       description: string;
     };
+    [key: string]: any; // Allow for any other properties
   };
+  [key: string]: any; // Allow for any other properties
 }
 
 interface RollbarOccurrenceResponse {
@@ -123,7 +125,10 @@ interface RollbarOccurrenceResponse {
     context?: string;
     code_version?: string;
     stack_trace?: any;
+    metadata?: any;
+    [key: string]: any; // Allow for any other properties
   };
+  [key: string]: any; // Allow for any other properties
 }
 
 // Register tools
@@ -139,7 +144,7 @@ server.tool(
       const counterUrl = `${ROLLBAR_API_BASE}/item_by_counter/${counter}`;
       const itemResponse = await makeRollbarRequest<RollbarApiResponse<RollbarItemResponse>>(counterUrl);
       console.error(itemResponse);
-      
+
       if (!itemResponse || itemResponse.err !== 0) {
         return {
           content: [
@@ -150,9 +155,9 @@ server.tool(
           ],
         };
       }
-      
+
       const item = itemResponse.result;
-      
+
       // Use the complete item data
       const formattedData = item;
 
@@ -160,7 +165,7 @@ server.tool(
       console.error(`Fetching occurrence details from: ${occurrenceUrl}`);
       const occurrenceResponse = await makeRollbarRequest<RollbarApiResponse<RollbarOccurrenceResponse>>(occurrenceUrl);
       console.error("Occurrence response:", occurrenceResponse);
-      
+
       if (!occurrenceResponse || occurrenceResponse.err !== 0) {
         // We got the item but failed to get occurrence, return just the item data
         return {
@@ -172,9 +177,14 @@ server.tool(
           ],
         };
       }
-      
+
       const occurrence = occurrenceResponse.result;
-      
+
+      // Remove the metadata section from occurrence.data to avoid exposing sensitive information
+      if (occurrence.data && occurrence.data.metadata) {
+        delete occurrence.data.metadata;
+      }
+
       // Combine item and occurrence data
       const responseData = {
         ...formattedData,
