@@ -255,7 +255,10 @@ server.tool(
   "get-deployments",
   "Get deployments data from Rollbar",
   {
-    limit: z.number().int().describe("Number of Rollbar deployments to retrieve"),
+    limit: z
+      .number()
+      .int()
+      .describe("Number of Rollbar deployments to retrieve"),
   },
   async ({ limit }) => {
     try {
