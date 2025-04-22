@@ -1,15 +1,18 @@
-name: Lint
+name: Lint & Build
 
-on:            # run on every branch push & PR
+on:
   push:
     branches: [ "**" ]
   pull_request:
 
+concurrency:                # cancel stale runs on the same branch/PR
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  lint:
+  quality:
     runs-on: ubuntu-latest
 
-    # Set up a clean Node.js 22 LTS environment and cache npm deps
     steps:
       - uses: actions/checkout@v4
 
@@ -17,18 +20,21 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm          # built‑in cache (≈2‑3× faster) :contentReference[oaicite:0]{index=0}
+          cache: npm                # native dependency cache :contentReference[oaicite:0]{index=0}
 
       - name: Install dependencies
-        run: npm ci           # reproducible install
+        run: npm ci                 # fast, lock‑file‑exact install
 
-      # ---- Lint & formatting checks ----
+      # ---------- Lint & formatting ----------
       - name: ESLint
-        run: npm run lint     # fails the job on any error
+        run: npm run lint
 
       - name: Prettier check
-        run: npm run format   # fails if files need re‑formatting
+        run: npm run format
 
-      - name: Type‑check      # Surface TS type errors without emitting JS
+      - name: Type‑check
         run: npx tsc --noEmit
 
+      # ---------- Build ----------
+      - name: Build (tsc + chmod)
+        run: npm run build
