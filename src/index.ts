@@ -32,7 +32,7 @@ const server = new McpServer({
         description:
           "Get deployment status and information for a Rollbar project",
       },
-      "get-versions": {
+      "get-version": {
         description: "Get version data and information for a Rollbar project",
       },
     },
@@ -303,7 +303,7 @@ server.tool(
 );
 
 server.tool(
-  "get-versions",
+  "get-version",
   "Get version details for a Rollbar project",
   {
     version: z.coerce.string().describe("GitSHA version to filter by"),
