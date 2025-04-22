@@ -2,7 +2,6 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import dotenv from "dotenv";
-import { describe } from "node:test";
 
 // Load environment variables from .env file
 dotenv.config();
@@ -12,7 +11,9 @@ const USER_AGENT = "rollbar-mcp-server/0.0.1";
 const ROLLBAR_ACCESS_TOKEN = process.env.ROLLBAR_ACCESS_TOKEN;
 
 if (!ROLLBAR_ACCESS_TOKEN) {
-  console.error("Error: ROLLBAR_ACCESS_TOKEN is not set in env var or .env file");
+  console.error(
+    "Error: ROLLBAR_ACCESS_TOKEN is not set in env var or .env file",
+  );
   process.exit(1);
 }
 
@@ -24,15 +25,16 @@ const server = new McpServer({
     resources: {},
     tools: {
       "get-item-details": {
-        description: "Get detailed information about a Rollbar item by its counter",
+        description:
+          "Get detailed information about a Rollbar item by its counter",
       },
-      "get-deployments":{
-        description: "Get deployment status and information for a Rollbar project",
+      "get-deployments": {
+        description:
+          "Get deployment status and information for a Rollbar project",
       },
     },
   },
 });
-
 
 // Helper function for making Rollbar API requests
 async function makeRollbarRequest<T>(url: string): Promise<T | null> {
@@ -58,11 +60,6 @@ async function makeRollbarRequest<T>(url: string): Promise<T | null> {
 interface RollbarApiResponse<T> {
   err: number;
   result: T;
-}
-
-interface RollbarItemByCounterResponse {
-  itemId: number;
-  message?: string;
 }
 
 interface RollbarItemResponse {
@@ -160,7 +157,10 @@ server.tool(
     try {
       // Redirects are followed, so we get an item response from the counter request
       const counterUrl = `${ROLLBAR_API_BASE}/item_by_counter/${counter}`;
-      const itemResponse = await makeRollbarRequest<RollbarApiResponse<RollbarItemResponse>>(counterUrl);
+      const itemResponse =
+        await makeRollbarRequest<RollbarApiResponse<RollbarItemResponse>>(
+          counterUrl,
+        );
       console.error(itemResponse);
 
       if (!itemResponse || itemResponse.err !== 0) {
@@ -181,7 +181,10 @@ server.tool(
 
       const occurrenceUrl = `${ROLLBAR_API_BASE}/instance/${item.last_occurrence_id}`;
       console.error(`Fetching occurrence details from: ${occurrenceUrl}`);
-      const occurrenceResponse = await makeRollbarRequest<RollbarApiResponse<RollbarOccurrenceResponse>>(occurrenceUrl);
+      const occurrenceResponse =
+        await makeRollbarRequest<RollbarApiResponse<RollbarOccurrenceResponse>>(
+          occurrenceUrl,
+        );
       console.error("Occurrence response:", occurrenceResponse);
 
       if (!occurrenceResponse || occurrenceResponse.err !== 0) {
@@ -190,8 +193,8 @@ server.tool(
           content: [
             {
               type: "text",
-              text: JSON.stringify(formattedData, null, 2)
-            }
+              text: JSON.stringify(formattedData, null, 2),
+            },
           ],
         };
       }
@@ -206,15 +209,15 @@ server.tool(
       // Combine item and occurrence data
       const responseData = {
         ...formattedData,
-        occurrence: occurrence
+        occurrence: occurrence,
       };
 
       return {
         content: [
           {
             type: "text",
-            text: JSON.stringify(responseData, null, 2)
-          }
+            text: JSON.stringify(responseData, null, 2),
+          },
         ],
       };
     } catch (error) {
@@ -231,18 +234,29 @@ server.tool(
   },
 );
 
-
 server.tool(
   "get-deployments",
   "Get deployment status and information for a Rollbar project",
   {
-    counter: z.number().int().describe("Limit of Rollbar deploys to list"),
+    page: z.coerce
+      .number()
+      .int()
+      .default(1)
+      .describe("Page number, starting from 1"),
+    limit: z.coerce
+      .number()
+      .int()
+      .max(5000)
+      .default(20)
+      .describe("Limit of Rollbar deploys to list (default 20, max 5000)"),
   },
-  async ({ counter }) => {
+  async ({ page, limit }) => {
     try {
-      // Redirects are followed, so we get an item response from the counter request
-      const deploysUrl = `${ROLLBAR_API_BASE}/deploys`;
-      const deploysResponse = await makeRollbarRequest<RollbarApiResponse<RollbarDeployResponse>>(deploysUrl);
+      const deploysUrl = `${ROLLBAR_API_BASE}/deploys?page=${page}&limit=${limit}`;
+      const deploysResponse =
+        await makeRollbarRequest<RollbarApiResponse<RollbarDeployResponse>>(
+          deploysUrl,
+        );
       console.error(deploysResponse);
 
       if (!deploysResponse || deploysResponse.err !== 0) {
@@ -263,11 +277,10 @@ server.tool(
         content: [
           {
             type: "text",
-            text: JSON.stringify(deployItem, null, 2)
-          }
+            text: JSON.stringify(deployItem, null, 2),
+          },
         ],
       };
-
     } catch (error) {
       console.error("Error in get-deployments tool:", error);
       return {
@@ -281,7 +294,6 @@ server.tool(
     }
   },
 );
-
 
 async function main() {
   const transport = new StdioServerTransport();
