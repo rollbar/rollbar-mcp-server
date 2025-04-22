@@ -32,6 +32,9 @@ const server = new McpServer({
         description:
           "Get deployment status and information for a Rollbar project",
       },
+      "get-versions": {
+        description: "Get version data and information for a Rollbar project",
+      },
     },
   },
 });
@@ -146,6 +149,20 @@ interface RollbarDeployResponse {
   [key: string]: any; // Allow for any other properties
 }
 
+interface RollbarVersionsResponse {
+  id: number;
+  version: string;
+  environment: string;
+  date_created: number;
+  first_occurrence_id: number;
+  first_occurrence_timestamp: number;
+  last_occurrence_id: number;
+  last_occurrence_timestamp: number;
+  deployed_by: string;
+  last_deploy_timestamp: number;
+  [key: string]: any; // Allow for any other properties
+}
+
 // Register tools
 server.tool(
   "get-item-details",
@@ -236,23 +253,10 @@ server.tool(
 
 server.tool(
   "get-deployments",
-  "Get deployment status and information for a Rollbar project",
-  {
-    page: z.coerce
-      .number()
-      .int()
-      .default(1)
-      .describe("Page number, starting from 1"),
-    limit: z.coerce
-      .number()
-      .int()
-      .max(5000)
-      .default(20)
-      .describe("Limit of Rollbar deploys to list (default 20, max 5000)"),
-  },
-  async ({ page, limit }) => {
+  "Get deployments data from Rollbar",
+  async () => {
     try {
-      const deploysUrl = `${ROLLBAR_API_BASE}/deploys?page=${page}&limit=${limit}`;
+      const deploysUrl = `${ROLLBAR_API_BASE}/deploys`;
       const deploysResponse =
         await makeRollbarRequest<RollbarApiResponse<RollbarDeployResponse>>(
           deploysUrl,
@@ -288,6 +292,61 @@ server.tool(
           {
             type: "text",
             text: `Error retrieving deployment details: ${error instanceof Error ? error.message : String(error)}`,
+          },
+        ],
+      };
+    }
+  },
+);
+
+server.tool(
+  "get-versions",
+  "Get version details for a Rollbar project",
+  {
+    version: z.coerce.string().describe("GitSHA version to filter by"),
+    environment: z.coerce
+      .string()
+      .default("production")
+      .describe("Environment to filter by (default: production)"),
+  },
+  async ({ version, environment }) => {
+    try {
+      const versionsUrl = `${ROLLBAR_API_BASE}/versions/${version}?environment=${environment}`;
+      const versionsResponse =
+        await makeRollbarRequest<RollbarApiResponse<RollbarVersionsResponse>>(
+          versionsUrl,
+        );
+      console.error(versionsResponse);
+
+      if (!versionsResponse || versionsResponse.err !== 0) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Failed to retrieve version data.`,
+            },
+          ],
+        };
+      }
+
+      const versionItem = versionsResponse.result;
+      console.error("Versions response:", versionItem);
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(versionItem, null, 2),
+          },
+        ],
+      };
+    } catch (error) {
+      console.error("Error in get-versions tool:", error);
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Error retrieving versions details: ${error instanceof Error ? error.message : String(error)}`,
           },
         ],
       };
