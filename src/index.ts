@@ -2,6 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import dotenv from "dotenv";
+import { describe } from "node:test";
 
 // Load environment variables from .env file
 dotenv.config();
@@ -24,6 +25,9 @@ const server = new McpServer({
     tools: {
       "get-item-details": {
         description: "Get detailed information about a Rollbar item by its counter",
+      },
+      "get-deployments":{
+        description: "Get deployment status and information for a Rollbar project",
       },
     },
   },
@@ -131,6 +135,20 @@ interface RollbarOccurrenceResponse {
   [key: string]: any; // Allow for any other properties
 }
 
+interface RollbarDeployResponse {
+  environment: string;
+  revision: string;
+  local_username: string;
+  comment: string;
+  status: string;
+  id: number;
+  project_id: number;
+  user_id: number;
+  start_time: number;
+  finish_time: number;
+  [key: string]: any; // Allow for any other properties
+}
+
 // Register tools
 server.tool(
   "get-item-details",
@@ -212,6 +230,58 @@ server.tool(
     }
   },
 );
+
+
+server.tool(
+  "get-deployments",
+  "Get deployment status and information for a Rollbar project",
+  {
+    counter: z.number().int().describe("Limit of Rollbar deploys to list"),
+  },
+  async ({ counter }) => {
+    try {
+      // Redirects are followed, so we get an item response from the counter request
+      const deploysUrl = `${ROLLBAR_API_BASE}/deploys`;
+      const deploysResponse = await makeRollbarRequest<RollbarApiResponse<RollbarDeployResponse>>(deploysUrl);
+      console.error(deploysResponse);
+
+      if (!deploysResponse || deploysResponse.err !== 0) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Failed to retrieve deployments.`,
+            },
+          ],
+        };
+      }
+
+      const deployItem = deploysResponse.result;
+      console.error("Deployments response:", deployItem);
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(deployItem, null, 2)
+          }
+        ],
+      };
+
+    } catch (error) {
+      console.error("Error in get-deployments tool:", error);
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Error retrieving deployment details: ${error instanceof Error ? error.message : String(error)}`,
+          },
+        ],
+      };
+    }
+  },
+);
+
 
 async function main() {
   const transport = new StdioServerTransport();
