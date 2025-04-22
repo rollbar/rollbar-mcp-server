@@ -19,6 +19,8 @@ This MCP server implementes the `stdio` server type, which means your AI tool (e
 
 `get-deployments(limit)`: List deploy data for the given project. Example prompt: `List the last 5 deployments` or `Are there any failed deployments?`
 
+`get-versions(version, environment)`: List version (sha) data for the given environment and project.
+
 ## How to Use
 
 Tested with node 22 (`nvm use 22`).
