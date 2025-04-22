@@ -254,9 +254,12 @@ server.tool(
 server.tool(
   "get-deployments",
   "Get deployments data from Rollbar",
-  async () => {
+  {
+    limit: z.number().int().describe("Number of Rollbar deployments to retrieve"),
+  },
+  async ({ limit }) => {
     try {
-      const deploysUrl = `${ROLLBAR_API_BASE}/deploys`;
+      const deploysUrl = `${ROLLBAR_API_BASE}/deploys?limit=${limit}`;
       const deploysResponse =
         await makeRollbarRequest<RollbarApiResponse<RollbarDeployResponse>>(
           deploysUrl,
