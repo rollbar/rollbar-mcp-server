@@ -17,6 +17,8 @@ This MCP server implementes the `stdio` server type, which means your AI tool (e
 
 `get-item-details(counter)`: Given an item number, fetch the item details and last occurrence details. Example prompt: `Diagnose the root cause of Rollbar item #123456`
 
+`get-deployments(limit)`: List deploy data for the given project. Example prompt: `List the last 5 deployments` or `Are there any failed deployments?`
+
 ## How to Use
 
 Tested with node 22 (`nvm use 22`).
