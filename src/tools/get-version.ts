@@ -9,11 +9,11 @@ export function registerGetVersionTool(server: McpServer) {
     "get-version",
     "Get version details for a Rollbar project",
     {
-      version: z.coerce.string().describe("GitSHA version to filter by"),
+      version: z.coerce.string().describe("Version string (e.g. git sha)"),
       environment: z.coerce
         .string()
         .default("production")
-        .describe("Environment to filter by (default: production)"),
+        .describe("Environment name (default: production)"),
     },
     async ({ version, environment }) => {
       try {
