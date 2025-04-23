@@ -1,0 +1,10 @@
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { registerGetItemDetailsTool } from "./get-item-details.js";
+import { registerGetDeploymentsTool } from "./get-deployments.js";
+import { registerGetVersionTool } from "./get-version.js";
+
+export function registerAllTools(server: McpServer) {
+  registerGetItemDetailsTool(server);
+  registerGetDeploymentsTool(server);
+  registerGetVersionTool(server);
+}
