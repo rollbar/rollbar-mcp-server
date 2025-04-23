@@ -19,7 +19,7 @@ This MCP server implementes the `stdio` server type, which means your AI tool (e
 
 `get-deployments(limit)`: List deploy data for the given project. Example prompt: `List the last 5 deployments` or `Are there any failed deployments?`
 
-`get-version(version, environment)`: List version (sha) data for the given environment and project.
+`get-version(version, environment)`: Fetch version details for the given version string, environment name, and the configured project.
 
 ## How to Use
 
