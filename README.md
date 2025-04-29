@@ -21,6 +21,8 @@ This MCP server implementes the `stdio` server type, which means your AI tool (e
 
 `get-version(version, environment)`: Fetch version details for the given version string, environment name, and the configured project.
 
+`get-top-items(environment)`: Fetch the top items in the last 24 hours given the environment name, and the configured project.
+
 ## How to Use
 
 Tested with node 22 (`nvm use 22`).
