@@ -1,0 +1,14 @@
+{
+    "servers": {
+      "rollbar": {
+        "type": "stdio",
+        "command": "node",
+        "args": [
+          "/rollbar-mcp-server/build/index.js"
+        ],
+        "env": {
+          "ROLLBAR_ACCESS_TOKEN": ""
+        }
+      }
+    }
+  }

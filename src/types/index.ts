@@ -43,6 +43,21 @@ export interface RollbarItemResponse {
   [key: string]: any; // Allow for any other properties
 }
 
+export interface RollbarTopItemResponse {
+  id: number;
+  environment: string;
+  title: string;
+  last_occurrence_timestamp: number;
+  project_id: number;
+  unique_occurrences: number;
+  occurrences: number;
+  framework: string;
+  level: string;
+  counter: number;
+  group_status: number;
+  [key: string]: any; // Allow for any other properties
+}
+
 export interface RollbarOccurrenceResponse {
   id: number;
   item_id: number;

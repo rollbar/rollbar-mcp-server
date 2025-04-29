@@ -20,6 +20,9 @@ const server = new McpServer({
       "get-version": {
         description: "Get version data and information for a Rollbar project",
       },
+      "get-top-items": {
+        description: "Get list of top items in the Rollbar project",
+      },
     },
   },
 });
