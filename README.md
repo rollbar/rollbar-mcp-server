@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/rollbar-rollbar-mcp-server-badge.png)](https://mseep.ai/app/rollbar-rollbar-mcp-server)
+
 # rollbar-mcp-server
 
 A Model Context Protocl (MCP) server for [Rollbar](https://rollbar.com).
