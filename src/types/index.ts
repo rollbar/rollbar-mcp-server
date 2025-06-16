@@ -116,3 +116,43 @@ export interface RollbarVersionsResponse {
   last_deploy_timestamp: number;
   [key: string]: any; // Allow for any other properties
 }
+
+export interface RollbarListItemResponse {
+  public_item_id: number;
+  integrations_data: string;
+  level_lock: number;
+  controlling_id: number;
+  last_activated_timestamp: number;
+  assigned_user_id: number;
+  group_status: number;
+  hash: string;
+  id: number;
+  environment: string;
+  title_lock: number;
+  title: string;
+  last_occurrence_id: number;
+  platform: string;
+  last_occurrence_timestamp: number;
+  first_occurrence_timestamp: number;
+  project_id: number;
+  resolved_in_version: string;
+  status: string;
+  unique_occurrences: number;
+  group_item_id: number;
+  framework: string;
+  level: string;
+  total_occurrences: number;
+  counter: number;
+  last_modified_by: number;
+  first_occurrence_id: number;
+  activating_occurrence_id: number;
+  last_resolved_timestamp: number;
+  [key: string]: any; // Allow for any other properties
+}
+
+export interface RollbarListItemsResponse {
+  page: number;
+  total_count: number;
+  items: RollbarListItemResponse[];
+  [key: string]: any; // Allow for any other properties
+}
