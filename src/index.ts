@@ -23,6 +23,10 @@ const server = new McpServer({
       "get-top-items": {
         description: "Get list of top items in the Rollbar project",
       },
+      "list-items": {
+        description:
+          "List all items in the Rollbar project with optional search and filtering",
+      },
     },
   },
 });
