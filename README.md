@@ -23,6 +23,8 @@ This MCP server implementes the `stdio` server type, which means your AI tool (e
 
 `get-top-items(environment)`: Fetch the top items in the last 24 hours given the environment name, and the configured project.
 
+`list-items(environment)`: List items filtered by status, environment and a search query.
+
 ## How to Use
 
 Tested with node 22 (`nvm use 22`).
