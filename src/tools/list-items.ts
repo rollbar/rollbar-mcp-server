@@ -29,7 +29,9 @@ export function registerListItemsTool(server: McpServer) {
         .string()
         .optional()
         .default("production")
-        .describe("Filter by environment (e.g., 'production', 'staging') (default: 'production')"),
+        .describe(
+          "Filter by environment (e.g., 'production', 'staging') (default: 'production')",
+        ),
       page: z
         .number()
         .int()
