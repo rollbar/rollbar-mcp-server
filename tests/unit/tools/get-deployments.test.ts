@@ -62,19 +62,13 @@ describe('get-deployments tool', () => {
   it('should handle API error response (err !== 0)', async () => {
     makeRollbarRequestMock.mockResolvedValueOnce(mockErrorResponse);
 
-    const result = await toolHandler({ limit: 5 });
-
-    expect(result.content[0].type).toBe('text');
-    expect(result.content[0].text).toBe('Failed to retrieve deployments.');
+    await expect(toolHandler({ limit: 5 })).rejects.toThrow('Rollbar API returned error: Invalid access token');
   });
 
   it('should handle null/undefined response', async () => {
     makeRollbarRequestMock.mockResolvedValueOnce(null);
 
-    const result = await toolHandler({ limit: 5 });
-
-    expect(result.content[0].type).toBe('text');
-    expect(result.content[0].text).toBe('Failed to retrieve deployments.');
+    await expect(toolHandler({ limit: 5 })).rejects.toThrow();
   });
 
   it('should use default limit parameter', async () => {
@@ -91,20 +85,13 @@ describe('get-deployments tool', () => {
     const error = new Error('Network error');
     makeRollbarRequestMock.mockRejectedValueOnce(error);
 
-    const result = await toolHandler({ limit: 10 });
-
-    expect(result.content[0].type).toBe('text');
-    expect(result.content[0].text).toBe('Error retrieving deployment details: Network error');
-    expect(console.error).toHaveBeenCalledWith('Error in get-deployments tool:', error);
+    await expect(toolHandler({ limit: 10 })).rejects.toThrow('Network error');
   });
 
   it('should handle non-Error exceptions', async () => {
     makeRollbarRequestMock.mockRejectedValueOnce('String error');
 
-    const result = await toolHandler({ limit: 10 });
-
-    expect(result.content[0].type).toBe('text');
-    expect(result.content[0].text).toBe('Error retrieving deployment details: String error');
+    await expect(toolHandler({ limit: 10 })).rejects.toThrow('String error');
   });
 
   it('should validate limit parameter with Zod schema', () => {
@@ -129,12 +116,11 @@ describe('get-deployments tool', () => {
     expect(result.content[0].text).toContain('  '); // Check for indentation
   });
 
-  it('should log deployment response to console.error', async () => {
+  it('should not log deployment response anymore', async () => {
     makeRollbarRequestMock.mockResolvedValueOnce(mockSuccessfulDeployResponse);
 
     await toolHandler({ limit: 10 });
 
-    expect(console.error).toHaveBeenCalledWith(mockSuccessfulDeployResponse);
-    expect(console.error).toHaveBeenCalledWith('Deployments response:', mockSuccessfulDeployResponse.result);
+    expect(console.error).not.toHaveBeenCalled();
   });
 });

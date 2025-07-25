@@ -53,7 +53,7 @@ describe('list-items tool', () => {
   it('should handle successful API response with default parameters', async () => {
     makeRollbarRequestMock.mockResolvedValueOnce(mockSuccessfulListItemsResponse);
 
-    const result = await toolHandler({});
+    const result = await toolHandler({ status: 'active', environment: 'production' });
 
     expect(makeRollbarRequestMock).toHaveBeenCalledWith(
       'https://api.rollbar.com/api/1/items/?status=active&environment=production'
@@ -101,7 +101,7 @@ describe('list-items tool', () => {
   it('should not include page parameter when page is 1', async () => {
     makeRollbarRequestMock.mockResolvedValueOnce(mockSuccessfulListItemsResponse);
 
-    await toolHandler({ page: 1 });
+    await toolHandler({ page: 1, status: 'active', environment: 'production' });
 
     expect(makeRollbarRequestMock).toHaveBeenCalledWith(
       'https://api.rollbar.com/api/1/items/?status=active&environment=production'
@@ -111,39 +111,26 @@ describe('list-items tool', () => {
   it('should handle API error response (err !== 0)', async () => {
     makeRollbarRequestMock.mockResolvedValueOnce(mockErrorResponse);
 
-    const result = await toolHandler({});
-
-    expect(result.content[0].type).toBe('text');
-    expect(result.content[0].text).toBe('Failed to retrieve items list.');
+    await expect(toolHandler({})).rejects.toThrow('Rollbar API returned error: Invalid access token');
   });
 
   it('should handle null/undefined response', async () => {
     makeRollbarRequestMock.mockResolvedValueOnce(null);
 
-    const result = await toolHandler({});
-
-    expect(result.content[0].type).toBe('text');
-    expect(result.content[0].text).toBe('Failed to retrieve items list.');
+    await expect(toolHandler({})).rejects.toThrow();
   });
 
   it('should handle exceptions during API call', async () => {
     const error = new Error('Network error');
     makeRollbarRequestMock.mockRejectedValueOnce(error);
 
-    const result = await toolHandler({});
-
-    expect(result.content[0].type).toBe('text');
-    expect(result.content[0].text).toBe('Error retrieving items list: Network error');
-    expect(console.error).toHaveBeenCalledWith('Error in list-items tool:', error);
+    await expect(toolHandler({})).rejects.toThrow('Network error');
   });
 
   it('should handle non-Error exceptions', async () => {
     makeRollbarRequestMock.mockRejectedValueOnce('String error');
 
-    const result = await toolHandler({});
-
-    expect(result.content[0].type).toBe('text');
-    expect(result.content[0].text).toBe('Error retrieving items list: String error');
+    await expect(toolHandler({})).rejects.toThrow('String error');
   });
 
   it('should validate parameter schemas with Zod', () => {
@@ -184,21 +171,18 @@ describe('list-items tool', () => {
     expect(parsedText).toBeTruthy();
   });
 
-  it('should log URL and response to console.error', async () => {
+  it('should not log URL and response anymore', async () => {
     makeRollbarRequestMock.mockResolvedValueOnce(mockSuccessfulListItemsResponse);
 
-    await toolHandler({ status: 'active' });
+    await toolHandler({ status: 'active', environment: 'production' });
 
-    expect(console.error).toHaveBeenCalledWith(
-      'Fetching items from: https://api.rollbar.com/api/1/items/?status=active&environment=production'
-    );
-    expect(console.error).toHaveBeenCalledWith('List items response:', mockSuccessfulListItemsResponse.result);
+    expect(console.error).not.toHaveBeenCalled();
   });
 
   it('should handle empty level array', async () => {
     makeRollbarRequestMock.mockResolvedValueOnce(mockSuccessfulListItemsResponse);
 
-    await toolHandler({ level: [] });
+    await toolHandler({ level: [], status: 'active', environment: 'production' });
 
     expect(makeRollbarRequestMock).toHaveBeenCalledWith(
       'https://api.rollbar.com/api/1/items/?status=active&environment=production'

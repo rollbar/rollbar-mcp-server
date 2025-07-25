@@ -72,39 +72,26 @@ describe('get-top-items tool', () => {
   it('should handle API error response (err !== 0)', async () => {
     makeRollbarRequestMock.mockResolvedValueOnce(mockErrorResponse);
 
-    const result = await toolHandler({ environment: 'production' });
-
-    expect(result.content[0].type).toBe('text');
-    expect(result.content[0].text).toBe('Failed to retrieve top item data.');
+    await expect(toolHandler({ environment: 'production' })).rejects.toThrow('Rollbar API returned error: Invalid access token');
   });
 
   it('should handle null/undefined response', async () => {
     makeRollbarRequestMock.mockResolvedValueOnce(null);
 
-    const result = await toolHandler({ environment: 'production' });
-
-    expect(result.content[0].type).toBe('text');
-    expect(result.content[0].text).toBe('Failed to retrieve top item data.');
+    await expect(toolHandler({ environment: 'production' })).rejects.toThrow();
   });
 
   it('should handle exceptions during API call', async () => {
     const error = new Error('Network error');
     makeRollbarRequestMock.mockRejectedValueOnce(error);
 
-    const result = await toolHandler({ environment: 'production' });
-
-    expect(result.content[0].type).toBe('text');
-    expect(result.content[0].text).toBe('Error retrieving top items details: Network error');
-    expect(console.error).toHaveBeenCalledWith('Error in get-topitems tool:', error);
+    await expect(toolHandler({ environment: 'production' })).rejects.toThrow('Network error');
   });
 
   it('should handle non-Error exceptions', async () => {
     makeRollbarRequestMock.mockRejectedValueOnce('String error');
 
-    const result = await toolHandler({ environment: 'production' });
-
-    expect(result.content[0].type).toBe('text');
-    expect(result.content[0].text).toBe('Error retrieving top items details: String error');
+    await expect(toolHandler({ environment: 'production' })).rejects.toThrow('String error');
   });
 
   it('should validate environment parameter with Zod schema', () => {
@@ -128,13 +115,12 @@ describe('get-top-items tool', () => {
     expect(result.content[0].text).toContain('  '); // Check for indentation
   });
 
-  it('should log response data to console.error', async () => {
+  it('should not log response data anymore', async () => {
     makeRollbarRequestMock.mockResolvedValueOnce(mockSuccessfulTopItemsResponse);
 
     await toolHandler({ environment: 'production' });
 
-    expect(console.error).toHaveBeenCalledWith(mockSuccessfulTopItemsResponse);
-    expect(console.error).toHaveBeenCalledWith('Top items response:', mockSuccessfulTopItemsResponse.result);
+    expect(console.error).not.toHaveBeenCalled();
   });
 
   it('should construct URL with correct parameters', async () => {

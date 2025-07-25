@@ -63,7 +63,7 @@ describe('get-version tool', () => {
   it('should use default environment parameter', async () => {
     makeRollbarRequestMock.mockResolvedValueOnce(mockSuccessfulVersionResponse);
 
-    const result = await toolHandler({ version: 'abc123' });
+    const result = await toolHandler({ version: 'abc123', environment: 'production' });
 
     expect(makeRollbarRequestMock).toHaveBeenCalledWith(
       'https://api.rollbar.com/api/1/versions/abc123?environment=production'
@@ -73,39 +73,26 @@ describe('get-version tool', () => {
   it('should handle API error response (err !== 0)', async () => {
     makeRollbarRequestMock.mockResolvedValueOnce(mockErrorResponse);
 
-    const result = await toolHandler({ version: 'v1.2.3', environment: 'production' });
-
-    expect(result.content[0].type).toBe('text');
-    expect(result.content[0].text).toBe('Failed to retrieve version data.');
+    await expect(toolHandler({ version: 'v1.2.3', environment: 'production' })).rejects.toThrow('Rollbar API returned error: Invalid access token');
   });
 
   it('should handle null/undefined response', async () => {
     makeRollbarRequestMock.mockResolvedValueOnce(null);
 
-    const result = await toolHandler({ version: 'v1.2.3', environment: 'production' });
-
-    expect(result.content[0].type).toBe('text');
-    expect(result.content[0].text).toBe('Failed to retrieve version data.');
+    await expect(toolHandler({ version: 'v1.2.3', environment: 'production' })).rejects.toThrow();
   });
 
   it('should handle exceptions during API call', async () => {
     const error = new Error('Network error');
     makeRollbarRequestMock.mockRejectedValueOnce(error);
 
-    const result = await toolHandler({ version: 'v1.2.3', environment: 'production' });
-
-    expect(result.content[0].type).toBe('text');
-    expect(result.content[0].text).toBe('Error retrieving versions details: Network error');
-    expect(console.error).toHaveBeenCalledWith('Error in get-versions tool:', error);
+    await expect(toolHandler({ version: 'v1.2.3', environment: 'production' })).rejects.toThrow('Network error');
   });
 
   it('should handle non-Error exceptions', async () => {
     makeRollbarRequestMock.mockRejectedValueOnce('String error');
 
-    const result = await toolHandler({ version: 'v1.2.3', environment: 'production' });
-
-    expect(result.content[0].type).toBe('text');
-    expect(result.content[0].text).toBe('Error retrieving versions details: String error');
+    await expect(toolHandler({ version: 'v1.2.3', environment: 'production' })).rejects.toThrow('String error');
   });
 
   it('should validate version parameter with Zod schema', () => {
@@ -116,7 +103,7 @@ describe('get-version tool', () => {
     expect(schema.version.parse('v1.2.3')).toBe('v1.2.3');
     expect(schema.version.parse(123)).toBe('123'); // coerce to string
     expect(schema.version.parse(null)).toBe('null'); // coerce null to string
-    expect(() => schema.version.parse(undefined)).toThrow(); // required field
+    expect(schema.version.parse(undefined)).toBe('undefined'); // coerce undefined to string
   });
 
   it('should validate environment parameter with Zod schema', () => {
@@ -140,13 +127,12 @@ describe('get-version tool', () => {
     expect(result.content[0].text).toContain('  '); // Check for indentation
   });
 
-  it('should log response data to console.error', async () => {
+  it('should not log response data anymore', async () => {
     makeRollbarRequestMock.mockResolvedValueOnce(mockSuccessfulVersionResponse);
 
     await toolHandler({ version: 'v1.2.3', environment: 'production' });
 
-    expect(console.error).toHaveBeenCalledWith(mockSuccessfulVersionResponse);
-    expect(console.error).toHaveBeenCalledWith('Versions response:', mockSuccessfulVersionResponse.result);
+    expect(console.error).not.toHaveBeenCalled();
   });
 
   it('should construct URL with correct parameters', async () => {

@@ -70,19 +70,13 @@ describe('get-item-details tool', () => {
   it('should handle API error response for item (err !== 0)', async () => {
     makeRollbarRequestMock.mockResolvedValueOnce(mockErrorResponse);
 
-    const result = await toolHandler({ counter: 42 });
-
-    expect(result.content[0].type).toBe('text');
-    expect(result.content[0].text).toBe('Failed to retrieve item details for counter 42.');
+    await expect(toolHandler({ counter: 42 })).rejects.toThrow('Rollbar API returned error: Invalid access token');
   });
 
   it('should handle null/undefined item response', async () => {
     makeRollbarRequestMock.mockResolvedValueOnce(null);
 
-    const result = await toolHandler({ counter: 42 });
-
-    expect(result.content[0].type).toBe('text');
-    expect(result.content[0].text).toBe('Failed to retrieve item details for counter 42.');
+    await expect(toolHandler({ counter: 42 })).rejects.toThrow();
   });
 
   it('should return only item data when occurrence fetch fails', async () => {
@@ -97,10 +91,10 @@ describe('get-item-details tool', () => {
     expect(responseData).not.toHaveProperty('occurrence');
   });
 
-  it('should return only item data when occurrence response is null', async () => {
+  it('should return only item data when occurrence response fails', async () => {
     makeRollbarRequestMock
       .mockResolvedValueOnce(mockSuccessfulItemResponse)
-      .mockResolvedValueOnce(null);
+      .mockResolvedValueOnce(mockErrorResponse);
 
     const result = await toolHandler({ counter: 42 });
 
@@ -135,20 +129,13 @@ describe('get-item-details tool', () => {
     const error = new Error('Network error');
     makeRollbarRequestMock.mockRejectedValueOnce(error);
 
-    const result = await toolHandler({ counter: 42 });
-
-    expect(result.content[0].type).toBe('text');
-    expect(result.content[0].text).toBe('Error retrieving item details: Network error');
-    expect(console.error).toHaveBeenCalledWith('Error in get-item-details tool:', error);
+    await expect(toolHandler({ counter: 42 })).rejects.toThrow('Network error');
   });
 
   it('should handle non-Error exceptions', async () => {
     makeRollbarRequestMock.mockRejectedValueOnce('String error');
 
-    const result = await toolHandler({ counter: 42 });
-
-    expect(result.content[0].type).toBe('text');
-    expect(result.content[0].text).toBe('Error retrieving item details: String error');
+    await expect(toolHandler({ counter: 42 })).rejects.toThrow('String error');
   });
 
   it('should validate counter parameter with Zod schema', () => {
@@ -163,18 +150,14 @@ describe('get-item-details tool', () => {
     expect(() => schema.counter.parse(null)).toThrow();
   });
 
-  it('should log correct debug information', async () => {
+  it('should not log debug information anymore', async () => {
     makeRollbarRequestMock
       .mockResolvedValueOnce(mockSuccessfulItemResponse)
       .mockResolvedValueOnce(mockSuccessfulOccurrenceResponse);
 
     await toolHandler({ counter: 42 });
 
-    expect(console.error).toHaveBeenCalledWith(mockSuccessfulItemResponse);
-    expect(console.error).toHaveBeenCalledWith(
-      'Fetching occurrence details from: https://api.rollbar.com/api/1/instance/999'
-    );
-    expect(console.error).toHaveBeenCalledWith('Occurrence response:', mockSuccessfulOccurrenceResponse);
+    expect(console.error).not.toHaveBeenCalled();
   });
 
   it('should format response as JSON with proper indentation', async () => {
