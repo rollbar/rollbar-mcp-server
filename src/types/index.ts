@@ -2,6 +2,7 @@
 export interface RollbarApiResponse<T> {
   err: number;
   result: T;
+  message?: string;
 }
 
 export interface RollbarItemResponse {
