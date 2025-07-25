@@ -15,47 +15,29 @@ export function registerGetDeploymentsTool(server: McpServer) {
         .describe("Number of Rollbar deployments to retrieve"),
     },
     async ({ limit }) => {
-      try {
-        const deploysUrl = `${ROLLBAR_API_BASE}/deploys?limit=${limit}`;
-        const deploysResponse =
-          await makeRollbarRequest<RollbarApiResponse<RollbarDeployResponse>>(
-            deploysUrl,
-          );
-        console.error(deploysResponse);
+      const deploysUrl = `${ROLLBAR_API_BASE}/deploys?limit=${limit}`;
+      const deploysResponse =
+        await makeRollbarRequest<RollbarApiResponse<RollbarDeployResponse>>(
+          deploysUrl,
+        );
 
-        if (!deploysResponse || deploysResponse.err !== 0) {
-          return {
-            content: [
-              {
-                type: "text",
-                text: `Failed to retrieve deployments.`,
-              },
-            ],
-          };
-        }
-
-        const deployItem = deploysResponse.result;
-        console.error("Deployments response:", deployItem);
-
-        return {
-          content: [
-            {
-              type: "text",
-              text: JSON.stringify(deployItem, null, 2),
-            },
-          ],
-        };
-      } catch (error) {
-        console.error("Error in get-deployments tool:", error);
-        return {
-          content: [
-            {
-              type: "text",
-              text: `Error retrieving deployment details: ${error instanceof Error ? error.message : String(error)}`,
-            },
-          ],
-        };
+      if (deploysResponse.err !== 0) {
+        const errorMessage =
+          deploysResponse.message ||
+          `Unknown error (code: ${deploysResponse.err})`;
+        throw new Error(`Rollbar API returned error: ${errorMessage}`);
       }
+
+      const deployments = deploysResponse.result;
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(deployments, null, 2),
+          },
+        ],
+      };
     },
   );
 }
