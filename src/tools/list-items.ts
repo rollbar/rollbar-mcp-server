@@ -44,7 +44,19 @@ export function registerListItemsTool(server: McpServer) {
         .optional()
         .describe("Search query to filter items by title or content"),
     },
-    async ({ status, level, environment, page, query }) => {
+    async ({
+      status,
+      level,
+      environment,
+      page,
+      query,
+    }: {
+      status?: string;
+      level?: string[];
+      environment?: string;
+      page?: number;
+      query?: string;
+    }) => {
       try {
         // Build query parameters
         const params = new URLSearchParams();
