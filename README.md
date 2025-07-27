@@ -7,11 +7,11 @@ A Model Context Protocl (MCP) server for [Rollbar](https://rollbar.com).
 
 ## Features
 
-This MCP server implementes the `stdio` server type, which means your AI tool (e.g. Claude) will run it directly; you don't run a separate process.
+This MCP server implementes the `stdio` server type, which means your AI tool (e.g. Claude) will run it directly; you don't run a separate process or connect over http.
 
 ### Configuration
 
-`ROLLBAR_ACCESS_TOKEN`: a `read`-scope access token for your Rollbar project.
+`ROLLBAR_ACCESS_TOKEN`: an access token for your Rollbar project with `read` and/or `write` scope.
 
 ### Tools
 
@@ -24,6 +24,8 @@ This MCP server implementes the `stdio` server type, which means your AI tool (e
 `get-top-items(environment)`: Fetch the top items in the last 24 hours given the environment name, and the configured project.
 
 `list-items(environment)`: List items filtered by status, environment and a search query.
+
+`update-item(itemId, status?, level?, title?, assignedUserId?, resolvedInVersion?, snoozed?, teamId?)`: Update an item's properties including status, level, title, assignment, and more. Example prompt: `Mark Rollbar item #123456 as resolved` or `Assign item #123456 to user ID 789`. (Requires `write` scope)
 
 ## How to Use
 
@@ -40,6 +42,67 @@ npm run build
 
 Configure your `.mcp.json` as follows:
 
+Using npx (recommended):
+
+```
+{
+  "mcpServers": {
+    "rollbar": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@rollbar/mcp-server"
+      ],
+      "env": {
+        "ROLLBAR_ACCESS_TOKEN": "<project read/write access token>"
+      }
+    }
+  }
+}
+```
+
+Or using a local installation:
+
+
+### VS Code
+
+Configure your `.vscode/mcp.json` as follows:
+
+Using npx (recommended):
+
+```
+{
+  "servers": {
+    "rollbar": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@rollbar/mcp-server"
+      ],
+      "env": {
+        "ROLLBAR_ACCESS_TOKEN": "<project read/write access token>"
+      }
+    }
+  }
+}
+```
+
+Or using a local installation:
+
+
+## How to Develop
+
+Install and build:
+
+```
+npm install
+npm run build
+```
+
+Run your local installation from Claude Code:
+
 ```
 {
   "mcpServers": {
@@ -50,16 +113,14 @@ Configure your `.mcp.json` as follows:
         "/ABSOLUTE/PATH/TO/rollbar-mcp-server/build/index.js"
       ],
       "env": {
-        "ROLLBAR_ACCESS_TOKEN": "<project read access token>"
+        "ROLLBAR_ACCESS_TOKEN": "<project read/write access token>"
       }
     }
   }
 }
 ```
 
-### VS Code
-
-Configure your `.vscode/mcp.json` as follows:
+Run your local installation from VSCode:
 
 ```
 {
@@ -71,20 +132,11 @@ Configure your `.vscode/mcp.json` as follows:
         "/ABSOLUTE/PATH/TO/rollbar-mcp-server/build/index.js"
       ],
       "env": {
-        "ROLLBAR_ACCESS_TOKEN": "<project read access token>"
+        "ROLLBAR_ACCESS_TOKEN": "<project read/write access token>"
       }
     }
   }
 }
-```
-
-## How to Develop
-
-Install and build:
-
-```
-npm install
-npm run build
 ```
 
 You can test an individual tool using the `@modelcontextprotocol/inspector` module. For example, test the tool `get-item-details` with arg `counter=2455389`:
