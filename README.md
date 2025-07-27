@@ -3,7 +3,7 @@
 A Model Context Protocl (MCP) server for [Rollbar](https://rollbar.com).
 
 > [!NOTE]
-> This software is pre-release, alpha quality, and under active development.
+> This software is alpha quality and under active development.
 
 ## Features
 
@@ -27,7 +27,7 @@ This MCP server implementes the `stdio` server type, which means your AI tool (e
 
 ## How to Use
 
-Tested with node 22 (`nvm use 22`).
+Tested with node 18, 20, and 22 (`nvm use 22`).
 
 Install and build:
 

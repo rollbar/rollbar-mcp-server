@@ -1,8 +1,12 @@
 {
-  "name": "rollbar-mcp-server",
-  "version": "0.0.1",
+  "name": "@rollbar/mcp-server",
+  "version": "0.1.0",
   "description": "Model Context Protocol server for Rollbar",
-  "main": "index.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rollbar/rollbar-mcp-server.git"
+  },
+  "main": "build/index.js",
   "type": "module",
   "bin": {
     "rollbar-mcp-server": "./build/index.js"
@@ -15,14 +19,26 @@
     "format:write": "prettier --write src",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "prepublishOnly": "npm run build && npm test"
   },
   "files": [
-    "build"
+    "build",
+    "src",
+    "README.md",
+    "LICENSE"
   ],
-  "keywords": [],
-  "author": "",
+  "keywords": [
+    "rollbar",
+    "mcp",
+    "error-monitoring",
+    "rollbar-mcp-server"
+  ],
+  "author": "Rollbar, Inc.",
   "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.10.1",
     "dotenv": "^17.2.1",
