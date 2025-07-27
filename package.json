@@ -4,12 +4,12 @@
   "description": "Model Context Protocol server for Rollbar",
   "repository": {
     "type": "git",
-    "url": "https://github.com/rollbar/rollbar-mcp-server.git"
+    "url": "git+https://github.com/rollbar/rollbar-mcp-server.git"
   },
   "main": "build/index.js",
   "type": "module",
   "bin": {
-    "rollbar-mcp-server": "./build/index.js"
+    "rollbar-mcp-server": "build/index.js"
   },
   "scripts": {
     "build": "tsc && chmod 755 build/index.js",
