@@ -1,7 +1,10 @@
 import { ROLLBAR_ACCESS_TOKEN, USER_AGENT } from "../config.js";
 
 // Helper function for making Rollbar API requests
-export async function makeRollbarRequest<T>(url: string): Promise<T> {
+export async function makeRollbarRequest<T>(
+  url: string,
+  options?: RequestInit,
+): Promise<T> {
   if (!ROLLBAR_ACCESS_TOKEN) {
     throw new Error("ROLLBAR_ACCESS_TOKEN environment variable is not set");
   }
@@ -10,9 +13,13 @@ export async function makeRollbarRequest<T>(url: string): Promise<T> {
     "User-Agent": USER_AGENT,
     "X-Rollbar-Access-Token": ROLLBAR_ACCESS_TOKEN,
     Accept: "application/json",
+    ...options?.headers,
   };
 
-  const response = await fetch(url, { headers });
+  const response = await fetch(url, {
+    ...options,
+    headers,
+  });
 
   if (!response.ok) {
     const errorText = await response.text();
