@@ -1,4 +1,5 @@
 import { createRequire } from "module";
+import { dirname, join } from "path";
 
 // Import rollbar's truncation module using CommonJS require
 const require = createRequire(import.meta.url);
@@ -12,7 +13,21 @@ interface RollbarTruncation {
   ) => { value: string };
 }
 
-const truncation = require("rollbar/src/truncation") as RollbarTruncation;
+// Load rollbar/src/truncation using require.
+// TODO - remove this workaround once https://github.com/rollbar/rollbar.js/issues/1283 is fixed.
+let truncation: RollbarTruncation;
+try {
+  // First try the direct import (works when running from source)
+  truncation = require("rollbar/src/truncation") as RollbarTruncation;
+} catch {
+  // If that fails, resolve through the main module path
+  // The main module is at rollbar/src/server/rollbar.js
+  // So we need to go up to rollbar/src/ and then find truncation.js
+  const rollbarPath = require.resolve("rollbar");
+  const rollbarSrcDir = dirname(dirname(rollbarPath)); // Go up from src/server to src
+  const truncationPath = join(rollbarSrcDir, "truncation.js");
+  truncation = require(truncationPath) as RollbarTruncation;
+}
 
 // Token estimation constants
 const CHARS_PER_TOKEN = 4; // Rough estimate: 1 token ≈ 4 characters
