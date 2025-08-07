@@ -7,6 +7,7 @@ import {
   RollbarItemResponse,
   RollbarOccurrenceResponse,
 } from "../types/index.js";
+import { truncateOccurrence } from "../utils/truncation.js";
 
 export function registerGetItemDetailsTool(server: McpServer) {
   server.tool(
@@ -14,8 +15,16 @@ export function registerGetItemDetailsTool(server: McpServer) {
     "Get item details for a Rollbar item",
     {
       counter: z.number().int().describe("Rollbar item counter"),
+      max_tokens: z
+        .number()
+        .int()
+        .optional()
+        .default(20000)
+        .describe(
+          "Maximum tokens for occurrence data in response (default: 20000). Occurrence response will be truncated if it exceeds this limit.",
+        ),
     },
-    async ({ counter }) => {
+    async ({ counter, max_tokens }) => {
       // Redirects are followed, so we get an item response from the counter request
       const counterUrl = `${ROLLBAR_API_BASE}/item_by_counter/${counter}`;
       const itemResponse =
@@ -38,7 +47,7 @@ export function registerGetItemDetailsTool(server: McpServer) {
         );
 
       if (occurrenceResponse.err !== 0) {
-        // We got the item but failed to get occurrence, return just the item data
+        // We got the item but failed to get occurrence. Return just the item data.
         return {
           content: [
             {
@@ -51,7 +60,7 @@ export function registerGetItemDetailsTool(server: McpServer) {
 
       const occurrence = occurrenceResponse.result;
 
-      // Remove the metadata section from occurrence.data to avoid exposing sensitive information
+      // Remove the metadata section from occurrence.data
       if (occurrence.data && occurrence.data.metadata) {
         delete occurrence.data.metadata;
       }
@@ -59,14 +68,14 @@ export function registerGetItemDetailsTool(server: McpServer) {
       // Combine item and occurrence data
       const responseData = {
         ...item,
-        occurrence: occurrence,
+        occurrence: truncateOccurrence(occurrence, max_tokens),
       };
 
       return {
         content: [
           {
             type: "text",
-            text: JSON.stringify(responseData, null, 2),
+            text: JSON.stringify(responseData, null),
           },
         ],
       };

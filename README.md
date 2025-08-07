@@ -15,7 +15,7 @@ This MCP server implementes the `stdio` server type, which means your AI tool (e
 
 ### Tools
 
-`get-item-details(counter)`: Given an item number, fetch the item details and last occurrence details. Example prompt: `Diagnose the root cause of Rollbar item #123456`
+`get-item-details(counter, max_tokens?)`: Given an item number, fetch the item details and last occurrence details. Supports an optional `max_tokens` parameter (default: 20000) to automatically truncate large occurrence responses. Example prompt: `Diagnose the root cause of Rollbar item #123456`
 
 `get-deployments(limit)`: List deploy data for the given project. Example prompt: `List the last 5 deployments` or `Are there any failed deployments?`
 
