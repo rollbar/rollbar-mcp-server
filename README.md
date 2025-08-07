@@ -1,6 +1,6 @@
 # rollbar-mcp-server
 
-A Model Context Protocl (MCP) server for [Rollbar](https://rollbar.com).
+A Model Context Protocol (MCP) server for [Rollbar](https://rollbar.com).
 
 > [!NOTE]
 > This software is alpha quality and under active development.
