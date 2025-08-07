@@ -3,7 +3,7 @@ import { dirname, join } from "path";
 
 //
 // -- Import rollbar's truncation module using CommonJS require --
-// 
+//
 // TODO - remove this workaround once https://github.com/rollbar/rollbar.js/issues/1283 is fixed.
 const require = createRequire(import.meta.url);
 
