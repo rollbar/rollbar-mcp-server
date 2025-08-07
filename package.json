@@ -1,6 +1,6 @@
 {
   "name": "@rollbar/mcp-server",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Model Context Protocol server for Rollbar",
   "repository": {
     "type": "git",
@@ -20,7 +20,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "test:e2e": "bash tests/e2e/test-npx-install.sh",
+    "test:e2e": "bash tests/e2e/test-npx-install.sh && bash tests/e2e/test-get-item-details.sh",
     "prepublishOnly": "npm run build && npm test"
   },
   "files": [
@@ -38,7 +38,7 @@
   "author": "Rollbar, Inc.",
   "license": "MIT",
   "engines": {
-    "node": ">=18"
+    "node": ">=20"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.10.1",

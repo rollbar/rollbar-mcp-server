@@ -1,8 +1,6 @@
 name: CI
 
 on:
-  push:
-    branches: [ "**" ]
   pull_request:
 
 concurrency:
@@ -46,3 +44,5 @@ jobs:
 
     - name: Run end-to-end tests
       run: npm run test:e2e
+      env:
+        ROLLBAR_E2E_READ_TOKEN: ${{ secrets.ROLLBAR_E2E_READ_TOKEN }}
