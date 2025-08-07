@@ -3,24 +3,31 @@ import { truncateOccurrence } from "../../../src/utils/truncation.js";
 
 // Mock the rollbar module
 vi.mock("module", () => ({
-  createRequire: () => () => ({
-    truncate: vi.fn((payload, jsonBackup, maxBytes) => {
-      // Simple mock truncation that returns data if under limit
-      const dataStr = JSON.stringify(payload);
-      if (dataStr.length <= maxBytes) {
-        return { value: dataStr };
-      }
-      // Return truncated version - simulate rollbar truncation
-      const truncated = {
-        ...payload,
-        data: {
-          ...payload.data,
-          _truncated: true,
-        },
-      };
-      return { value: JSON.stringify(truncated) };
-    }),
-  }),
+  createRequire: () => {
+    const mockRequire = (path) => ({
+      truncate: vi.fn((payload, jsonBackup, maxBytes) => {
+        // Simple mock truncation that returns data if under limit
+        const dataStr = JSON.stringify(payload);
+        if (dataStr.length <= maxBytes) {
+          return { value: dataStr };
+        }
+        // Return truncated version - simulate rollbar truncation
+        const truncated = {
+          ...payload,
+          data: {
+            ...payload.data,
+            _truncated: true,
+          },
+        };
+        return { value: JSON.stringify(truncated) };
+      }),
+    });
+    mockRequire.resolve = (moduleName) => {
+      // Return a mock path for rollbar module
+      return "/mock/node_modules/rollbar/src/server/rollbar.js";
+    };
+    return mockRequire;
+  },
 }));
 
 describe("truncation", () => {
