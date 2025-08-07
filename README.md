@@ -29,7 +29,7 @@ This MCP server implementes the `stdio` server type, which means your AI tool (e
 
 ## How to Use
 
-Tested with node 18, 20, and 22 (`nvm use 22`).
+Tested with node 20 and 22 (`nvm use 22`).
 
 Install and build:
 
@@ -52,7 +52,7 @@ Using npx (recommended):
       "command": "npx",
       "args": [
         "-y",
-        "@rollbar/mcp-server"
+        "@rollbar/mcp-server@latest"
       ],
       "env": {
         "ROLLBAR_ACCESS_TOKEN": "<project read/write access token>"
@@ -62,7 +62,7 @@ Using npx (recommended):
 }
 ```
 
-Or using a local installation:
+Or using a local development installation - see CONTRIBUTING.md.
 
 
 ### VS Code
@@ -79,7 +79,7 @@ Using npx (recommended):
       "command": "npx",
       "args": [
         "-y",
-        "@rollbar/mcp-server"
+        "@rollbar/mcp-server@latest"
       ],
       "env": {
         "ROLLBAR_ACCESS_TOKEN": "<project read/write access token>"
@@ -89,59 +89,4 @@ Using npx (recommended):
 }
 ```
 
-Or using a local installation:
-
-
-## How to Develop
-
-Install and build:
-
-```
-npm install
-npm run build
-```
-
-Run your local installation from Claude Code:
-
-```
-{
-  "mcpServers": {
-    "rollbar": {
-      "type": "stdio",
-      "command": "node",
-      "args": [
-        "/ABSOLUTE/PATH/TO/rollbar-mcp-server/build/index.js"
-      ],
-      "env": {
-        "ROLLBAR_ACCESS_TOKEN": "<project read/write access token>"
-      }
-    }
-  }
-}
-```
-
-Run your local installation from VSCode:
-
-```
-{
-  "servers": {
-    "rollbar": {
-      "type": "stdio",
-      "command": "node",
-      "args": [
-        "/ABSOLUTE/PATH/TO/rollbar-mcp-server/build/index.js"
-      ],
-      "env": {
-        "ROLLBAR_ACCESS_TOKEN": "<project read/write access token>"
-      }
-    }
-  }
-}
-```
-
-You can test an individual tool using the `@modelcontextprotocol/inspector` module. For example, test the tool `get-item-details` with arg `counter=2455389`:
-
-```
-npx @modelcontextprotocol/inspector --cli -e ROLLBAR_ACCESS_TOKEN=$TOKEN node build/index.js --method tools/call --tool-name get-item-details --tool-arg counter=2455389 --debug
-```
-
+Or using a local development installation - see CONTRIBUTING.md.
