@@ -5,3 +5,5 @@ build/
 
 **/CLAUDE.local.md
 coverage/
+
+*.tgz
