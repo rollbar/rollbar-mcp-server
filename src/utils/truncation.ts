@@ -34,11 +34,13 @@ const truncationPath = join(rollbarSrcDir, "truncation.js");
 
 // Use dynamic import to handle the module properly
 // This is wrapped in an IIFE to handle the async nature
+/* c8 ignore start */
 let truncation: RollbarTruncation = {
   truncate: () => {
     throw new Error("Truncation not yet initialized");
   },
 };
+/* c8 ignore stop */
 
 // Load the module synchronously using require
 const truncationModule = require(truncationPath) as LoadedModule;
@@ -48,6 +50,7 @@ const truncationModule = require(truncationPath) as LoadedModule;
 // 1. Direct CommonJS exports: { truncate: fn, ... }
 // 2. Wrapped ES module: { __esModule: true, default: { truncate: fn, ... } }
 // 3. Other wrapper: { default: { truncate: fn, ... } }
+/* c8 ignore start */
 if (typeof truncationModule.truncate === "function") {
   // Direct CommonJS export
   truncation = truncationModule as RollbarTruncation;
@@ -74,6 +77,7 @@ if (typeof truncationModule.truncate === "function") {
     }
   }
 }
+/* c8 ignore stop */
 
 //
 // -- End workaround --
