@@ -1,9 +1,23 @@
-import { createRequire } from "module";
-import { dirname, join } from "path";
 import truncation from "rollbar/src/truncation";
 
-// Token estimation constants
-const CHARS_PER_TOKEN = 4; // Rough estimate: 1 token ≈ 4 characters
+// Type definition for the result returned by stringify function in rollbar/src/utility
+interface StringifyResult {
+  error?: Error;
+  value: string;
+}
+
+// Type definition for the module rollbar/src/truncation
+interface TruncationModule {
+  truncate: (
+    payload: any,
+    jsonBackup: typeof JSON.stringify,
+    maxSize: number,
+  ) => StringifyResult;
+}
+
+const typedTruncation = truncation as TruncationModule;
+
+const CHARS_PER_TOKEN = 4; // Rough estimate: 1 token = 4 characters
 
 /**
  * Truncates an occurrence to fit within token limit
@@ -19,7 +33,7 @@ export function truncateOccurrence(
   const maxBytes = maxTokens * CHARS_PER_TOKEN;
 
   // Use rollbar.js truncation with our calculated max size
-  const result = truncation.truncate(occurrence, JSON.stringify, maxBytes);
+  const result = typedTruncation.truncate(occurrence, JSON.stringify, maxBytes);
   const truncatedPayload: unknown = JSON.parse(result.value);
   return truncatedPayload;
 }
