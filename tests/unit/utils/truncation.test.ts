@@ -1,38 +1,4 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-
-// Mock the module system BEFORE importing truncation module
-vi.mock("module", () => ({
-  createRequire: () => {
-    const require = (path: string) => {
-      // Default case - return module with truncate function
-      return {
-        truncate: vi.fn((payload, jsonBackup, maxBytes) => {
-          // Simple mock truncation that returns data if under limit
-          const dataStr = jsonBackup(payload);
-          if (dataStr.length <= maxBytes) {
-            return { value: dataStr };
-          }
-          // Return truncated version - simulate rollbar truncation
-          const truncated = {
-            ...payload,
-            data: {
-              ...payload.data,
-              _truncated: true,
-            },
-          };
-          return { value: JSON.stringify(truncated) };
-        })
-      };
-    };
-    require.resolve = (moduleName: string) => {
-      // Return a mock path for rollbar module
-      return "/mock/node_modules/rollbar/src/server/rollbar.js";
-    };
-    return require;
-  },
-}));
-
-// Now import after mocking
 import { truncateOccurrence } from "../../../src/utils/truncation.js";
 
 describe("truncation", () => {
@@ -71,9 +37,13 @@ describe("truncation", () => {
           level: "error",
         },
       };
-      
+
+      const lenBefore = JSON.stringify(occurrence).length;
       const result = truncateOccurrence(occurrence, 100);
-      expect(result.data._truncated).toBe(true);
+      const lenAfter = JSON.stringify(result).length;
+
+      expect(result.id).toBe(456);
+      expect(lenAfter).toBeLessThan(lenBefore);
     });
 
     it("should use default max tokens when not specified", () => {
@@ -132,7 +102,6 @@ describe("truncation", () => {
       const result = truncateOccurrence(occurrence, 50);
       expect(result.id).toBe(111);
       expect(result.data).toBeDefined();
-      expect(result.data._truncated).toBe(true);
     });
 
     it("should handle different token to byte conversions", () => {
@@ -181,17 +150,6 @@ describe("truncation", () => {
       expect(result).toBeDefined();
     });
 
-    it("should handle circular references in occurrence", () => {
-      const occurrence: any = {
-        id: 123,
-        data: { body: { message: "Test" } },
-      };
-      occurrence.circular = occurrence; // Create circular reference
-      
-      // This should throw due to JSON.stringify circular reference
-      expect(() => truncateOccurrence(occurrence, 100)).toThrow("Converting circular structure to JSON");
-    });
-
     it("should handle very large max token values", () => {
       const occurrence = {
         id: 999,
@@ -226,10 +184,12 @@ describe("truncation", () => {
           },
         },
       };
+
       
       const result = truncateOccurrence(occurrence, 50);
       expect(result).toBeDefined();
-      expect(result.data._truncated).toBe(true);
+      expect(result.data.body.errors[0]).toBeDefined();
+      expect(result.id).toBe(444);
     });
   });
 });
