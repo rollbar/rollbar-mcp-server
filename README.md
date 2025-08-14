@@ -31,13 +31,6 @@ This MCP server implementes the `stdio` server type, which means your AI tool (e
 
 Tested with node 20 and 22 (`nvm use 22`).
 
-Install and build:
-
-```
-npm install
-npm run build
-```
-
 ### Claude Code
 
 Configure your `.mcp.json` as follows:
