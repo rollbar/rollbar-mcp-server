@@ -69,6 +69,7 @@ export function registerUpdateItemTool(server: McpServer) {
       const url = `${ROLLBAR_API_BASE}/item/${itemId}`;
       const response = await makeRollbarRequest<RollbarApiResponse<unknown>>(
         url,
+        "update-item",
         {
           method: "PATCH",
           headers: {

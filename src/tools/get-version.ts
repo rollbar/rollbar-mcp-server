@@ -17,10 +17,9 @@ export function registerGetVersionTool(server: McpServer) {
     },
     async ({ version, environment }) => {
       const versionsUrl = `${ROLLBAR_API_BASE}/versions/${version}?environment=${environment}`;
-      const versionsResponse =
-        await makeRollbarRequest<RollbarApiResponse<RollbarVersionsResponse>>(
-          versionsUrl,
-        );
+      const versionsResponse = await makeRollbarRequest<
+        RollbarApiResponse<RollbarVersionsResponse>
+      >(versionsUrl, "get-version");
 
       if (versionsResponse.err !== 0) {
         const errorMessage =

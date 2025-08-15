@@ -6,7 +6,9 @@ import packageJson from "../package.json" with { type: "json" };
 dotenv.config({ quiet: true });
 
 export const ROLLBAR_API_BASE = "https://api.rollbar.com/api/1";
-export const USER_AGENT = `rollbar-mcp-server/${packageJson.version}`;
+export function getUserAgent(toolName: string): string {
+  return `rollbar-mcp-server/${packageJson.version} (tool: ${toolName})`;
+}
 export const ROLLBAR_ACCESS_TOKEN = process.env.ROLLBAR_ACCESS_TOKEN;
 
 if (!ROLLBAR_ACCESS_TOKEN) {
