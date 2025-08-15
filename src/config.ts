@@ -1,7 +1,8 @@
 import dotenv from "dotenv";
 
 // Load environment variables from .env file
-dotenv.config();
+// `quiet: true` to prevent logging to stdio which disrupts some mcp clients
+dotenv.config({ quiet: true });
 
 export const ROLLBAR_API_BASE = "https://api.rollbar.com/api/1";
 export const USER_AGENT = "rollbar-mcp-server/0.0.1";
