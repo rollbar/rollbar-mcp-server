@@ -24,7 +24,7 @@ describe('MCP Server Integration', () => {
   beforeEach(() => {
     consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     processExitSpy = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never);
-    
+
     // Mock transport
     mockTransport = {
       start: vi.fn(),
@@ -64,7 +64,7 @@ describe('MCP Server Integration', () => {
         }
       }
     };
-    
+
     server = new McpServer(config);
 
     expect(server).toBeDefined();
@@ -136,9 +136,9 @@ describe('MCP Server Integration', () => {
     });
 
     const connectSpy = vi.spyOn(server, 'connect').mockResolvedValue();
-    
+
     await server.connect(mockTransport);
-    
+
     expect(connectSpy).toHaveBeenCalledWith(mockTransport);
   });
 
@@ -151,19 +151,19 @@ describe('MCP Server Integration', () => {
 
     // Mock the connect method
     const connectSpy = vi.spyOn(server, 'connect').mockResolvedValue();
-    
+
     // Simulate main function
     const transport = new StdioServerTransport();
     await server.connect(transport);
     console.error('Rollbar MCP Server running on stdio');
-    
+
     expect(connectSpy).toHaveBeenCalled();
     expect(consoleErrorSpy).toHaveBeenCalledWith('Rollbar MCP Server running on stdio');
   });
 
   it('should handle fatal errors in main', async () => {
     const testError = new Error('Connection failed');
-    
+
     server = new McpServer({
       name: 'rollbar',
       version: '0.0.1',
@@ -172,7 +172,7 @@ describe('MCP Server Integration', () => {
 
     // Mock connect to throw error
     vi.spyOn(server, 'connect').mockRejectedValue(testError);
-    
+
     // Simulate main function with error
     try {
       const transport = new StdioServerTransport();
@@ -181,7 +181,7 @@ describe('MCP Server Integration', () => {
       console.error('Fatal error in main():', error);
       process.exit(1);
     }
-    
+
     expect(consoleErrorSpy).toHaveBeenCalledWith('Fatal error in main():', testError);
     expect(processExitSpy).toHaveBeenCalledWith(1);
   });
@@ -197,7 +197,7 @@ describe('MCP Server Integration', () => {
         }
       }
     };
-    
+
     server = new McpServer(config);
 
     // Verify server has required MCP methods
@@ -209,6 +209,69 @@ describe('MCP Server Integration', () => {
     expect(config.capabilities).toBeDefined();
   });
 
+  it('should not output anything to stdout during server startup', async () => {
+    const { spawn } = await import('child_process');
+    const { promisify } = await import('util');
+    const execAsync = promisify((await import('child_process')).exec);
+
+    // First ensure the server is built
+    await execAsync('npm run build');
+
+    // Spawn the server process to capture its output
+    const serverProcess = spawn('node', ['build/index.js'], {
+      stdio: ['pipe', 'pipe', 'pipe'],
+      env: { ...process.env, ROLLBAR_ACCESS_TOKEN: 'test-token' }
+    });
+
+    let stdoutOutput = '';
+
+    // Collect stdout output
+    serverProcess.stdout?.on('data', (data) => {
+      stdoutOutput += data.toString();
+    });
+
+    // Send initialization request to trigger server startup
+    const initRequest = JSON.stringify({
+      jsonrpc: "2.0",
+      method: "initialize",
+      params: {
+        protocolVersion: "1.0.0",
+        capabilities: {},
+        clientInfo: { name: "test-client", version: "1.0.0" }
+      },
+      id: 1
+    }) + '\n';
+
+    serverProcess.stdin?.write(initRequest);
+
+    // Wait for server to process the request or timeout
+    await new Promise<void>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        serverProcess.kill();
+        reject(new Error('Server startup timeout'));
+      }, 5000);
+
+      serverProcess.stdout?.on('data', (data) => {
+        const response = data.toString();
+        if (response.includes('"jsonrpc":"2.0"')) {
+          clearTimeout(timeout);
+          serverProcess.kill();
+          resolve();
+        }
+      });
+
+      serverProcess.on('error', (err) => {
+        clearTimeout(timeout);
+        reject(err);
+      });
+    });
+
+    // The MCP JSON response is expected, but anything else is not.
+    // If response is not valid json, fail the test.
+    var response = JSON.parse(stdoutOutput);
+    expect(response.result).toBeDefined();
+  });
+
   it('should handle concurrent tool registration', () => {
     server = new McpServer({
       name: 'rollbar',
@@ -217,16 +280,16 @@ describe('MCP Server Integration', () => {
     });
 
     const toolSpy = vi.spyOn(server, 'tool');
-    
+
     // Register all tools concurrently
     const registrations = [
       () => server.tool('tool1', 'desc1', {}, async () => ({ content: [] })),
       () => server.tool('tool2', 'desc2', {}, async () => ({ content: [] })),
       () => server.tool('tool3', 'desc3', {}, async () => ({ content: [] }))
     ];
-    
+
     registrations.forEach(reg => reg());
-    
+
     expect(toolSpy).toHaveBeenCalledTimes(3);
   });
 
@@ -238,7 +301,7 @@ describe('MCP Server Integration', () => {
     });
 
     const toolSpy = vi.spyOn(server, 'tool');
-    
+
     server.tool('error-tool', 'Test error handling', {}, async (params) => {
       throw new Error('Tool execution failed');
     });
@@ -277,12 +340,12 @@ describe('MCP Server Integration', () => {
       version: '0.0.1',
       capabilities
     };
-    
+
     server = new McpServer(config);
 
     expect(capabilities).toEqual(capabilities);
     expect(Object.keys(capabilities.tools)).toHaveLength(5);
-    
+
     // Verify all tools have descriptions
     Object.values(capabilities.tools).forEach(tool => {
       expect(tool.description).toBeDefined();
