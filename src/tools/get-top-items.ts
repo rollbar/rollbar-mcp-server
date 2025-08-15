@@ -16,10 +16,9 @@ export function registerGetTopItemsTool(server: McpServer) {
     },
     async ({ environment }) => {
       const reportUrl = `${ROLLBAR_API_BASE}/reports/top_active_items?hours=24&environments=${environment}&sort=occurrences`;
-      const reportResponse =
-        await makeRollbarRequest<RollbarApiResponse<RollbarTopItemResponse>>(
-          reportUrl,
-        );
+      const reportResponse = await makeRollbarRequest<
+        RollbarApiResponse<RollbarTopItemResponse>
+      >(reportUrl, "get-top-items");
 
       if (reportResponse.err !== 0) {
         const errorMessage =

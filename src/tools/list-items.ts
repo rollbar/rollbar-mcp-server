@@ -82,10 +82,9 @@ export function registerListItemsTool(server: McpServer) {
 
       const listUrl = `${ROLLBAR_API_BASE}/items/?${params.toString()}`;
 
-      const listResponse =
-        await makeRollbarRequest<RollbarApiResponse<RollbarListItemsResponse>>(
-          listUrl,
-        );
+      const listResponse = await makeRollbarRequest<
+        RollbarApiResponse<RollbarListItemsResponse>
+      >(listUrl, "list-items");
 
       if (listResponse.err !== 0) {
         const errorMessage =

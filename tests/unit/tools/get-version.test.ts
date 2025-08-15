@@ -53,7 +53,8 @@ describe('get-version tool', () => {
     const result = await toolHandler({ version: 'v1.2.3', environment: 'staging' });
 
     expect(makeRollbarRequestMock).toHaveBeenCalledWith(
-      'https://api.rollbar.com/api/1/versions/v1.2.3?environment=staging'
+      'https://api.rollbar.com/api/1/versions/v1.2.3?environment=staging',
+      'get-version'
     );
     expect(result.content[0].type).toBe('text');
     expect(result.content[0].text).toContain('"version": "v1.2.3"');
@@ -66,7 +67,8 @@ describe('get-version tool', () => {
     const result = await toolHandler({ version: 'abc123', environment: 'production' });
 
     expect(makeRollbarRequestMock).toHaveBeenCalledWith(
-      'https://api.rollbar.com/api/1/versions/abc123?environment=production'
+      'https://api.rollbar.com/api/1/versions/abc123?environment=production',
+      'get-version'
     );
   });
 
@@ -141,7 +143,8 @@ describe('get-version tool', () => {
     await toolHandler({ version: 'git-sha-abc123', environment: 'development' });
 
     expect(makeRollbarRequestMock).toHaveBeenCalledWith(
-      'https://api.rollbar.com/api/1/versions/git-sha-abc123?environment=development'
+      'https://api.rollbar.com/api/1/versions/git-sha-abc123?environment=development',
+      'get-version'
     );
   });
 });

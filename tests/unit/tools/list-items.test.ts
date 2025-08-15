@@ -56,7 +56,8 @@ describe('list-items tool', () => {
     const result = await toolHandler({ status: 'active', environment: 'production' });
 
     expect(makeRollbarRequestMock).toHaveBeenCalledWith(
-      'https://api.rollbar.com/api/1/items/?status=active&environment=production'
+      'https://api.rollbar.com/api/1/items/?status=active&environment=production',
+      'list-items'
     );
     
     const responseData = JSON.parse(result.content[0].text);
@@ -86,7 +87,8 @@ describe('list-items tool', () => {
     });
 
     expect(makeRollbarRequestMock).toHaveBeenCalledWith(
-      'https://api.rollbar.com/api/1/items/?status=resolved&level=error&level=critical&environment=staging&page=2&q=TypeError'
+      'https://api.rollbar.com/api/1/items/?status=resolved&level=error&level=critical&environment=staging&page=2&q=TypeError',
+      'list-items'
     );
     
     const responseData = JSON.parse(result.content[0].text);
@@ -104,7 +106,8 @@ describe('list-items tool', () => {
     await toolHandler({ page: 1, status: 'active', environment: 'production' });
 
     expect(makeRollbarRequestMock).toHaveBeenCalledWith(
-      'https://api.rollbar.com/api/1/items/?status=active&environment=production'
+      'https://api.rollbar.com/api/1/items/?status=active&environment=production',
+      'list-items'
     );
   });
 
@@ -185,7 +188,8 @@ describe('list-items tool', () => {
     await toolHandler({ level: [], status: 'active', environment: 'production' });
 
     expect(makeRollbarRequestMock).toHaveBeenCalledWith(
-      'https://api.rollbar.com/api/1/items/?status=active&environment=production'
+      'https://api.rollbar.com/api/1/items/?status=active&environment=production',
+      'list-items'
     );
   });
 

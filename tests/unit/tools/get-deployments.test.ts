@@ -52,7 +52,8 @@ describe('get-deployments tool', () => {
     const result = await toolHandler({ limit: 10 });
 
     expect(makeRollbarRequestMock).toHaveBeenCalledWith(
-      'https://api.rollbar.com/api/1/deploys?limit=10'
+      'https://api.rollbar.com/api/1/deploys?limit=10',
+      'get-deployments'
     );
     expect(result.content[0].type).toBe('text');
     expect(result.content[0].text).toContain('"environment": "production"');
@@ -77,7 +78,8 @@ describe('get-deployments tool', () => {
     const result = await toolHandler({ limit: 20 });
 
     expect(makeRollbarRequestMock).toHaveBeenCalledWith(
-      'https://api.rollbar.com/api/1/deploys?limit=20'
+      'https://api.rollbar.com/api/1/deploys?limit=20',
+      'get-deployments'
     );
   });
 

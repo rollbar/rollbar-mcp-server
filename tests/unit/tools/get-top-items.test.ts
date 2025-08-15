@@ -52,7 +52,8 @@ describe('get-top-items tool', () => {
     const result = await toolHandler({ environment: 'staging' });
 
     expect(makeRollbarRequestMock).toHaveBeenCalledWith(
-      'https://api.rollbar.com/api/1/reports/top_active_items?hours=24&environments=staging&sort=occurrences'
+      'https://api.rollbar.com/api/1/reports/top_active_items?hours=24&environments=staging&sort=occurrences',
+      'get-top-items'
     );
     expect(result.content[0].type).toBe('text');
     expect(result.content[0].text).toContain('"id": 1');
@@ -65,7 +66,8 @@ describe('get-top-items tool', () => {
     const result = await toolHandler({ environment: 'production' });
 
     expect(makeRollbarRequestMock).toHaveBeenCalledWith(
-      'https://api.rollbar.com/api/1/reports/top_active_items?hours=24&environments=production&sort=occurrences'
+      'https://api.rollbar.com/api/1/reports/top_active_items?hours=24&environments=production&sort=occurrences',
+      'get-top-items'
     );
   });
 
@@ -129,7 +131,8 @@ describe('get-top-items tool', () => {
     await toolHandler({ environment: 'development' });
 
     expect(makeRollbarRequestMock).toHaveBeenCalledWith(
-      'https://api.rollbar.com/api/1/reports/top_active_items?hours=24&environments=development&sort=occurrences'
+      'https://api.rollbar.com/api/1/reports/top_active_items?hours=24&environments=development&sort=occurrences',
+      'get-top-items'
     );
   });
 });

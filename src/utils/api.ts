@@ -1,8 +1,9 @@
-import { ROLLBAR_ACCESS_TOKEN, USER_AGENT } from "../config.js";
+import { ROLLBAR_ACCESS_TOKEN, getUserAgent } from "../config.js";
 
 // Helper function for making Rollbar API requests
 export async function makeRollbarRequest<T>(
   url: string,
+  toolName: string,
   options?: RequestInit,
 ): Promise<T> {
   if (!ROLLBAR_ACCESS_TOKEN) {
@@ -10,7 +11,7 @@ export async function makeRollbarRequest<T>(
   }
 
   const headers = {
-    "User-Agent": USER_AGENT,
+    "User-Agent": getUserAgent(toolName),
     "X-Rollbar-Access-Token": ROLLBAR_ACCESS_TOKEN,
     Accept: "application/json",
     ...options?.headers,

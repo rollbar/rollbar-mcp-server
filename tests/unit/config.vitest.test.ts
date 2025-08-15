@@ -30,9 +30,9 @@ describe('config', () => {
     expect(ROLLBAR_API_BASE).toBe('https://api.rollbar.com/api/1');
   });
 
-  it('should have correct user agent', async () => {
-    const { USER_AGENT } = await import('../../src/config.js');
-    expect(USER_AGENT).toBe('rollbar-mcp-server/0.0.1');
+  it('should have getUserAgent function that generates correct user agent string', async () => {
+    const { getUserAgent } = await import('../../src/config.js');
+    expect(getUserAgent('test-tool')).toBe('rollbar-mcp-server/0.2.3 (tool: test-tool)');
   });
 
   it('should load access token from environment', async () => {
