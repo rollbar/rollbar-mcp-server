@@ -16,10 +16,9 @@ export function registerGetDeploymentsTool(server: McpServer) {
     },
     async ({ limit }) => {
       const deploysUrl = `${ROLLBAR_API_BASE}/deploys?limit=${limit}`;
-      const deploysResponse =
-        await makeRollbarRequest<RollbarApiResponse<RollbarDeployResponse>>(
-          deploysUrl,
-        );
+      const deploysResponse = await makeRollbarRequest<
+        RollbarApiResponse<RollbarDeployResponse>
+      >(deploysUrl, "get-deployments");
 
       if (deploysResponse.err !== 0) {
         const errorMessage =

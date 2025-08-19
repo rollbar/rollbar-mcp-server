@@ -67,6 +67,7 @@ describe('update-item tool', () => {
 
     expect(makeRollbarRequestMock).toHaveBeenCalledWith(
       'https://api.rollbar.com/api/1/item/123',
+      'update-item',
       {
         method: 'PATCH',
         headers: {
@@ -99,6 +100,7 @@ describe('update-item tool', () => {
 
     expect(makeRollbarRequestMock).toHaveBeenCalledWith(
       'https://api.rollbar.com/api/1/item/456',
+      'update-item',
       {
         method: 'PATCH',
         headers: {
@@ -174,6 +176,7 @@ describe('update-item tool', () => {
 
     expect(makeRollbarRequestMock).toHaveBeenCalledWith(
       'https://api.rollbar.com/api/1/item/123',
+      'update-item',
       {
         method: 'PATCH',
         headers: {
@@ -252,6 +255,7 @@ describe('update-item tool', () => {
 
     expect(makeRollbarRequestMock).toHaveBeenCalledWith(
       'https://api.rollbar.com/api/1/item/123',
+      'update-item',
       {
         method: 'PATCH',
         headers: {

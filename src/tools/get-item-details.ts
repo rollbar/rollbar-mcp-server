@@ -27,10 +27,9 @@ export function registerGetItemDetailsTool(server: McpServer) {
     async ({ counter, max_tokens }) => {
       // Redirects are followed, so we get an item response from the counter request
       const counterUrl = `${ROLLBAR_API_BASE}/item_by_counter/${counter}`;
-      const itemResponse =
-        await makeRollbarRequest<RollbarApiResponse<RollbarItemResponse>>(
-          counterUrl,
-        );
+      const itemResponse = await makeRollbarRequest<
+        RollbarApiResponse<RollbarItemResponse>
+      >(counterUrl, "get-item-details");
 
       if (itemResponse.err !== 0) {
         const errorMessage =
@@ -41,10 +40,9 @@ export function registerGetItemDetailsTool(server: McpServer) {
       const item = itemResponse.result;
 
       const occurrenceUrl = `${ROLLBAR_API_BASE}/instance/${item.last_occurrence_id}`;
-      const occurrenceResponse =
-        await makeRollbarRequest<RollbarApiResponse<RollbarOccurrenceResponse>>(
-          occurrenceUrl,
-        );
+      const occurrenceResponse = await makeRollbarRequest<
+        RollbarApiResponse<RollbarOccurrenceResponse>
+      >(occurrenceUrl, "get-item-details");
 
       if (occurrenceResponse.err !== 0) {
         // We got the item but failed to get occurrence. Return just the item data.

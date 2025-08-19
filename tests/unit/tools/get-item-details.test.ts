@@ -74,10 +74,12 @@ describe('get-item-details tool', () => {
     const result = await toolHandler({ counter: 42 });
 
     expect(makeRollbarRequestMock).toHaveBeenCalledWith(
-      'https://api.rollbar.com/api/1/item_by_counter/42'
+      'https://api.rollbar.com/api/1/item_by_counter/42',
+      'get-item-details'
     );
     expect(makeRollbarRequestMock).toHaveBeenCalledWith(
-      'https://api.rollbar.com/api/1/instance/999'
+      'https://api.rollbar.com/api/1/instance/999',
+      'get-item-details'
     );
     
     const responseData = JSON.parse(result.content[0].text);
