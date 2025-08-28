@@ -66,7 +66,7 @@ Using npx (recommended):
 
 ```
 {
-    "servers": {
+    "mcpServers": {
         "rollbar": {
             "type": "stdio",
             "command": "npx",
