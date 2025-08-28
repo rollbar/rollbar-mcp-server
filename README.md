@@ -58,6 +58,33 @@ Using npx (recommended):
 Or using a local development installation - see CONTRIBUTING.md.
 
 
+## Junie
+
+Configure your `.junie/mcp/mcp.json` as follows:
+
+Using npx (recommended):
+
+```
+{
+    "servers": {
+        "rollbar": {
+            "type": "stdio",
+            "command": "npx",
+            "args": [
+                "-y",
+                "@rollbar/mcp-server@latest"
+            ],
+            "env": {
+                "ROLLBAR_ACCESS_TOKEN": "<project read/write access token>"
+            }
+        }
+    }
+}
+```
+
+Or using a local development installation - see CONTRIBUTING.md.
+
+
 ### VS Code
 
 Configure your `.vscode/mcp.json` as follows:
@@ -83,3 +110,4 @@ Using npx (recommended):
 ```
 
 Or using a local development installation - see CONTRIBUTING.md.
+
