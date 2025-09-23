@@ -35,8 +35,6 @@ Tested with node 20 and 22 (`nvm use 22`).
 
 Configure your `.mcp.json` as follows:
 
-Using npx (recommended):
-
 ```
 {
   "mcpServers": {
@@ -55,14 +53,22 @@ Using npx (recommended):
 }
 ```
 
-Or using a local development installation - see CONTRIBUTING.md.
+
+### Codex CLI
+
+Add to your `~/.codex/config.toml`:
+
+```
+[mcp_servers.rollbar]
+command = "npx"
+args = ["-y", "@rollbar/mcp-server@latest"]
+env = { "ROLLBAR_ACCESS_TOKEN" = "<project read/write acecss token>" }
+```
 
 
-## Junie
+### Junie
 
 Configure your `.junie/mcp/mcp.json` as follows:
-
-Using npx (recommended):
 
 ```
 {
@@ -82,14 +88,10 @@ Using npx (recommended):
 }
 ```
 
-Or using a local development installation - see CONTRIBUTING.md.
-
 
 ### VS Code
 
 Configure your `.vscode/mcp.json` as follows:
-
-Using npx (recommended):
 
 ```
 {
@@ -108,6 +110,4 @@ Using npx (recommended):
   }
 }
 ```
-
-Or using a local development installation - see CONTRIBUTING.md.
 
