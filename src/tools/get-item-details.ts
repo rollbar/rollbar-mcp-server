@@ -50,7 +50,7 @@ export function registerGetItemDetailsTool(server: McpServer) {
           content: [
             {
               type: "text",
-              text: JSON.stringify(item, null, 2),
+              text: JSON.stringify(item),
             },
           ],
         };
@@ -73,7 +73,7 @@ export function registerGetItemDetailsTool(server: McpServer) {
         content: [
           {
             type: "text",
-            text: JSON.stringify(responseData, null),
+            text: JSON.stringify(responseData),
           },
         ],
       };

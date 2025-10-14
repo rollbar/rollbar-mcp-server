@@ -1,10 +1,11 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 describe('config utilities', () => {
   let getUserAgent: any;
 
   beforeEach(async () => {
     vi.resetModules();
+    process.env.ROLLBAR_ACCESS_TOKEN = 'test-token';
     
     // Mock the package.json import
     vi.doMock('../../src/package.json', () => ({
@@ -13,6 +14,10 @@ describe('config utilities', () => {
 
     const configModule = await import('../../src/config.js');
     getUserAgent = configModule.getUserAgent;
+  });
+
+  afterEach(() => {
+    delete process.env.ROLLBAR_ACCESS_TOKEN;
   });
 
   describe('getUserAgent', () => {

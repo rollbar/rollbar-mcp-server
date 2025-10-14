@@ -57,8 +57,9 @@ describe('get-version tool', () => {
       'get-version'
     );
     expect(result.content[0].type).toBe('text');
-    expect(result.content[0].text).toContain('"version": "v1.2.3"');
-    expect(result.content[0].text).toContain('"environment": "production"');
+    const parsed = JSON.parse(result.content[0].text);
+    expect(parsed.version).toBe('v1.2.3');
+    expect(parsed.environment).toBe('production');
   });
 
   it('should use default environment parameter', async () => {
@@ -119,14 +120,14 @@ describe('get-version tool', () => {
     expect(schema.environment.parse(null)).toBe('null'); // coerce null to string
   });
 
-  it('should format response as JSON with proper indentation', async () => {
+  it('should format response as compact JSON', async () => {
     makeRollbarRequestMock.mockResolvedValueOnce(mockSuccessfulVersionResponse);
 
     const result = await toolHandler({ version: 'v1.2.3', environment: 'production' });
 
     const parsedText = JSON.parse(result.content[0].text);
     expect(parsedText).toEqual(mockSuccessfulVersionResponse.result);
-    expect(result.content[0].text).toContain('  '); // Check for indentation
+    expect(result.content[0].text).toBe(JSON.stringify(parsedText));
   });
 
   it('should not log response data anymore', async () => {

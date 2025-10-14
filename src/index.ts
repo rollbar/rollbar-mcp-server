@@ -29,6 +29,10 @@ const server = new McpServer({
         description:
           "List all items in the Rollbar project with optional search and filtering",
       },
+      "get-replay": {
+        description:
+          "Get replay data for a specific session replay in Rollbar",
+      },
     },
   },
 });

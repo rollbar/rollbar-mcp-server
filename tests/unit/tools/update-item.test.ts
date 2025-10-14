@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { registerUpdateItemTool } from '../../../src/tools/update-item.js';
-import { mockSuccessfulApiResponse, mockErrorResponse } from '../../fixtures/rollbar-responses.js';
+import { mockErrorResponse } from '../../fixtures/rollbar-responses.js';
 
 vi.mock('../../../src/utils/api.js', () => ({
   makeRollbarRequest: vi.fn()
@@ -77,7 +77,8 @@ describe('update-item tool', () => {
       }
     );
     expect(result.content[0].type).toBe('text');
-    expect(result.content[0].text).toContain('"status": "resolved"');
+    const parsed = JSON.parse(result.content[0].text);
+    expect(parsed.status).toBe('resolved');
   });
 
   it('should handle multiple field updates', async () => {
@@ -118,7 +119,8 @@ describe('update-item tool', () => {
       }
     );
     expect(result.content[0].type).toBe('text');
-    expect(result.content[0].text).toContain('"title": "Updated title"');
+    const parsed = JSON.parse(result.content[0].text);
+    expect(parsed.title).toBe('Updated title');
   });
 
   it('should throw error when no fields provided to update', async () => {
@@ -224,7 +226,7 @@ describe('update-item tool', () => {
     expect(() => schema.itemId.parse(null)).toThrow();
   });
 
-  it('should format response as JSON with proper indentation', async () => {
+  it('should format response as compact JSON', async () => {
     const mockResponse = {
       err: 0,
       result: { id: 123, status: 'resolved', level: 'info' }
@@ -238,7 +240,7 @@ describe('update-item tool', () => {
 
     const parsedText = JSON.parse(result.content[0].text);
     expect(parsedText).toEqual(mockResponse.result);
-    expect(result.content[0].text).toContain('  '); // Check for indentation
+    expect(result.content[0].text).toBe(JSON.stringify(parsedText));
   });
 
   it('should handle boolean snoozed field correctly', async () => {

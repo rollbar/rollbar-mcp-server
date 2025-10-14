@@ -182,7 +182,7 @@ describe('get-item-details tool', () => {
     expect(console.error).not.toHaveBeenCalled();
   });
 
-  it('should format response as valid JSON', async () => {
+  it('should format response as compact valid JSON', async () => {
     makeRollbarRequestMock
       .mockResolvedValueOnce(mockSuccessfulItemResponse)
       .mockResolvedValueOnce(mockSuccessfulOccurrenceResponse);
@@ -193,6 +193,7 @@ describe('get-item-details tool', () => {
     const parsedText = JSON.parse(result.content[0].text);
     expect(parsedText).toBeTruthy();
     expect(parsedText.counter).toBe(42);
+    expect(result.content[0].text).toBe(JSON.stringify(parsedText));
   });
 
   describe('truncation functionality', () => {

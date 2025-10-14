@@ -56,8 +56,9 @@ describe('get-top-items tool', () => {
       'get-top-items'
     );
     expect(result.content[0].type).toBe('text');
-    expect(result.content[0].text).toContain('"id": 1');
-    expect(result.content[0].text).toContain('"title": "Top Error"');
+    const parsed = JSON.parse(result.content[0].text);
+    expect(parsed.id).toBe(1);
+    expect(parsed.title).toBe('Top Error');
   });
 
   it('should use default environment parameter', async () => {
@@ -107,14 +108,14 @@ describe('get-top-items tool', () => {
     expect(schema.environment.parse(null)).toBe('null'); // coerce null to string
   });
 
-  it('should format response as JSON with proper indentation', async () => {
+  it('should format response as compact JSON', async () => {
     makeRollbarRequestMock.mockResolvedValueOnce(mockSuccessfulTopItemsResponse);
 
     const result = await toolHandler({ environment: 'production' });
 
     const parsedText = JSON.parse(result.content[0].text);
     expect(parsedText).toEqual(mockSuccessfulTopItemsResponse.result);
-    expect(result.content[0].text).toContain('  '); // Check for indentation
+    expect(result.content[0].text).toBe(JSON.stringify(parsedText));
   });
 
   it('should not log response data anymore', async () => {

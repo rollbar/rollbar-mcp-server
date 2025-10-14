@@ -164,14 +164,14 @@ describe('list-items tool', () => {
     expect(schema.query.parse('search term')).toBe('search term');
   });
 
-  it('should format response as JSON with proper indentation', async () => {
+  it('should format response as compact JSON', async () => {
     makeRollbarRequestMock.mockResolvedValueOnce(mockSuccessfulListItemsResponse);
 
     const result = await toolHandler({});
 
-    expect(result.content[0].text).toContain('  '); // Check for indentation
     const parsedText = JSON.parse(result.content[0].text);
     expect(parsedText).toBeTruthy();
+    expect(result.content[0].text).toBe(JSON.stringify(parsedText));
   });
 
   it('should not log URL and response anymore', async () => {
