@@ -1,8 +1,18 @@
 import { z } from "zod";
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { ROLLBAR_API_BASE } from "../config.js";
-import { makeRollbarRequest } from "../utils/api.js";
-import { RollbarApiResponse } from "../types/index.js";
+import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import {
+  buildReplayResourceUri,
+  cacheReplayData,
+  fetchReplayData,
+} from "../resources/index.js";
+
+function buildResourceLinkDescription(
+  environment: string,
+  sessionId: string,
+  replayId: string,
+) {
+  return `Session replay payload for session ${sessionId} (${environment}) replay ${replayId}.`;
+}
 
 export function registerGetReplayTool(server: McpServer) {
   server.tool(
@@ -20,28 +30,37 @@ export function registerGetReplayTool(server: McpServer) {
       replayId: z.string().min(1).describe("Replay identifier to retrieve"),
     },
     async ({ environment, sessionId, replayId }) => {
-      const replayUrl = `${ROLLBAR_API_BASE}/environment/${encodeURIComponent(
+      const replayData = await fetchReplayData(
         environment,
-      )}/session/${encodeURIComponent(sessionId)}/replay/${encodeURIComponent(
+        sessionId,
         replayId,
-      )}`;
+      );
 
-      const replayResponse = await makeRollbarRequest<
-        RollbarApiResponse<unknown>
-      >(replayUrl, "get-replay");
+      const resourceUri = buildReplayResourceUri(
+        environment,
+        sessionId,
+        replayId,
+      );
 
-      if (replayResponse.err !== 0) {
-        const errorMessage =
-          replayResponse.message ||
-          `Unknown error (code: ${replayResponse.err})`;
-        throw new Error(`Rollbar API returned error: ${errorMessage}`);
-      }
+      cacheReplayData(resourceUri, replayData);
 
       return {
         content: [
           {
             type: "text",
-            text: JSON.stringify(replayResponse.result),
+            text: `Replay ${replayId} for session ${sessionId} in ${environment} is available as ${resourceUri}. Use read-resource to download the JSON payload.`,
+          },
+          {
+            type: "resource_link",
+            name: resourceUri,
+            title: `Replay ${replayId}`,
+            uri: resourceUri,
+            description: buildResourceLinkDescription(
+              environment,
+              sessionId,
+              replayId,
+            ),
+            mimeType: "application/json",
           },
         ],
       };

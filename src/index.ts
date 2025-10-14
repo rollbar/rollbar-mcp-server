@@ -3,6 +3,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { registerAllTools } from "./tools/index.js";
+import { registerAllResources } from "./resources/index.js";
 
 // Create server instance
 const server = new McpServer({
@@ -37,6 +38,7 @@ const server = new McpServer({
 });
 
 // Register all tools
+registerAllResources(server);
 registerAllTools(server);
 
 async function main() {

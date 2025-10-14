@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { registerGetReplayTool } from '../../../src/tools/get-replay.js';
 import { mockSuccessfulReplayResponse, mockErrorResponse } from '../../fixtures/rollbar-responses.js';
+import { buildReplayResourceUri } from '../../../src/resources/index.js';
 
 vi.mock('../../../src/utils/api.js', () => ({
   makeRollbarRequest: vi.fn()
@@ -43,7 +44,7 @@ describe('get-replay tool', () => {
     );
   });
 
-  it('should fetch replay data and return compact JSON', async () => {
+  it('should fetch replay data and return a resource link', async () => {
     makeRollbarRequestMock.mockResolvedValueOnce(mockSuccessfulReplayResponse);
 
     const result = await toolHandler({
@@ -57,10 +58,23 @@ describe('get-replay tool', () => {
       'get-replay'
     );
 
-    expect(result.content[0].type).toBe('text');
-    const parsed = JSON.parse(result.content[0].text);
-    expect(parsed).toEqual(mockSuccessfulReplayResponse.result);
-    expect(result.content[0].text).toBe(JSON.stringify(parsed));
+    const expectedResourceUri = buildReplayResourceUri(
+      'production',
+      'session-123',
+      'replay-456'
+    );
+
+    expect(result.content).toHaveLength(2);
+    expect(result.content[0]).toMatchObject({
+      type: 'text',
+      text: expect.stringContaining(expectedResourceUri)
+    });
+
+    expect(result.content[1]).toMatchObject({
+      type: 'resource_link',
+      uri: expectedResourceUri,
+      mimeType: 'application/json'
+    });
   });
 
   it('should encode URL components when necessary', async () => {
