@@ -33,7 +33,7 @@ export function registerGetTopItemsTool(server: McpServer) {
         content: [
           {
             type: "text",
-            text: JSON.stringify(topItems, null, 2),
+            text: JSON.stringify(topItems),
           },
         ],
       };

@@ -33,7 +33,7 @@ export function registerGetDeploymentsTool(server: McpServer) {
         content: [
           {
             type: "text",
-            text: JSON.stringify(deployments, null, 2),
+            text: JSON.stringify(deployments),
           },
         ],
       };

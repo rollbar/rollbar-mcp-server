@@ -156,6 +156,25 @@ export const mockSuccessfulTopItemsResponse: RollbarApiResponse<RollbarTopItemRe
   }
 };
 
+export const mockSuccessfulReplayResponse: RollbarApiResponse<Record<string, unknown>> = {
+  err: 0,
+  result: {
+    id: "replay-123",
+    session_id: "session-456",
+    environment: "production",
+    status: "available",
+    event_count: 42,
+    first_event_timestamp: 1700000000,
+    last_event_timestamp: 1700001800,
+    data: {
+      events: [
+        { type: "navigated", url: "https://example.com", timestamp: 1700000000 },
+        { type: "click", selector: "#cta", timestamp: 1700000100 }
+      ]
+    }
+  }
+};
+
 export const mockErrorResponse = {
   err: 1,
   message: "Invalid access token"

@@ -89,7 +89,7 @@ export function registerUpdateItemTool(server: McpServer) {
         content: [
           {
             type: "text",
-            text: JSON.stringify(response.result, null, 2),
+            text: JSON.stringify(response.result),
           },
         ],
       };

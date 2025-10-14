@@ -56,8 +56,9 @@ describe('get-deployments tool', () => {
       'get-deployments'
     );
     expect(result.content[0].type).toBe('text');
-    expect(result.content[0].text).toContain('"environment": "production"');
-    expect(result.content[0].text).toContain('"revision": "abc123"');
+    const parsed = JSON.parse(result.content[0].text);
+    expect(parsed.environment).toBe('production');
+    expect(parsed.revision).toBe('abc123');
   });
 
   it('should handle API error response (err !== 0)', async () => {
@@ -108,14 +109,14 @@ describe('get-deployments tool', () => {
     expect(() => schema.limit.parse(null)).toThrow();
   });
 
-  it('should format response as JSON with proper indentation', async () => {
+  it('should format response as compact JSON', async () => {
     makeRollbarRequestMock.mockResolvedValueOnce(mockSuccessfulDeployResponse);
 
     const result = await toolHandler({ limit: 10 });
 
     const parsedText = JSON.parse(result.content[0].text);
     expect(parsedText).toEqual(mockSuccessfulDeployResponse.result);
-    expect(result.content[0].text).toContain('  '); // Check for indentation
+    expect(result.content[0].text).toBe(JSON.stringify(parsedText));
   });
 
   it('should not log deployment response anymore', async () => {

@@ -114,7 +114,7 @@ export function registerListItemsTool(server: McpServer) {
         content: [
           {
             type: "text",
-            text: JSON.stringify(formattedResponse, null, 2),
+            text: JSON.stringify(formattedResponse),
           },
         ],
       };

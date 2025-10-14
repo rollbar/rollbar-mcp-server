@@ -34,7 +34,7 @@ export function registerGetVersionTool(server: McpServer) {
         content: [
           {
             type: "text",
-            text: JSON.stringify(versionData, null, 2),
+            text: JSON.stringify(versionData),
           },
         ],
       };
