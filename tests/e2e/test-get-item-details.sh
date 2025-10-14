@@ -63,10 +63,10 @@ cd "$TEMP_DIR"
 # Copy the tarball to temp dir for npx to use
 cp "$PROJECT_ROOT/$TARBALL" .
 
-echo "Running: npx -y @modelcontextprotocol/inspector --cli -e ROLLBAR_ACCESS_TOKEN=\$ROLLBAR_E2E_READ_TOKEN npx -y ./$TARBALL --method tools/call --tool-name get-item-details --tool-arg counter=8 --tool-arg max_tokens=100"
+echo "Running: npx --yes --no-install @modelcontextprotocol/inspector --cli -e ROLLBAR_ACCESS_TOKEN=\$ROLLBAR_E2E_READ_TOKEN npx --yes ./$TARBALL --method tools/call --tool-name get-item-details --tool-arg counter=8 --tool-arg max_tokens=100"
 
 # Run the command and capture output
-npx -y @modelcontextprotocol/inspector --cli -e ROLLBAR_ACCESS_TOKEN=$ROLLBAR_E2E_READ_TOKEN npx -y ./$TARBALL --method tools/call --tool-name get-item-details --tool-arg counter=8 --tool-arg max_tokens=100 > test-output.json 2>&1
+npx --yes --no-install @modelcontextprotocol/inspector --cli -e ROLLBAR_ACCESS_TOKEN=$ROLLBAR_E2E_READ_TOKEN npx --yes ./$TARBALL --method tools/call --tool-name get-item-details --tool-arg counter=8 --tool-arg max_tokens=100 > test-output.json 2>&1
 
 # Check the output using jq
 HAS_CONTENT=$(jq -r 'has("content")' test-output.json 2>/dev/null || echo "false")
