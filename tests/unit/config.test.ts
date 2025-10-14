@@ -2,10 +2,15 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 describe('config utilities', () => {
   let getUserAgent: any;
+  let originalToken: string | undefined; // Preserve any real token injected by CI so we can restore it later.
 
   beforeEach(async () => {
     vi.resetModules();
-    process.env.ROLLBAR_ACCESS_TOKEN = 'test-token';
+    originalToken = process.env.ROLLBAR_ACCESS_TOKEN;
+    // Force a token during the test run only when CI hasn't provided one so importing config.ts doesn't call process.exit.
+    if (originalToken === undefined) {
+      process.env.ROLLBAR_ACCESS_TOKEN = 'test-token';
+    }
     
     // Mock the package.json import
     vi.doMock('../../src/package.json', () => ({
@@ -17,7 +22,12 @@ describe('config utilities', () => {
   });
 
   afterEach(() => {
-    delete process.env.ROLLBAR_ACCESS_TOKEN;
+    // Put back the original token (or clear it) so parallel tests see the same environment state.
+    if (originalToken === undefined) {
+      delete process.env.ROLLBAR_ACCESS_TOKEN;
+    } else {
+      process.env.ROLLBAR_ACCESS_TOKEN = originalToken;
+    }
   });
 
   describe('getUserAgent', () => {
