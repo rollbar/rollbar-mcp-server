@@ -7,7 +7,8 @@ import { ROLLBAR_API_BASE } from "../config.js";
 import { makeRollbarRequest } from "../utils/api.js";
 import { RollbarApiResponse } from "../types/index.js";
 
-const REPLAY_URI_TEMPLATE = "rollbar://replay/{environment}/{sessionId}/{replayId}";
+const REPLAY_URI_TEMPLATE =
+  "rollbar://replay/{environment}/{sessionId}/{replayId}";
 const REPLAY_RESOURCE_NAME = "rollbar-session-replay";
 const REPLAY_RESOURCE_TITLE = "Rollbar Session Replay";
 const REPLAY_MIME_TYPE = "application/json";
@@ -57,15 +58,15 @@ export function cacheReplayData(uri: string, data: unknown) {
   replayCache.set(uri, { data, expiresAt: Date.now() + CACHE_TTL_MS });
 }
 
-function getCachedReplayData(uri: string): unknown | null {
+function getCachedReplayData(uri: string) {
   const cached = replayCache.get(uri);
   if (!cached) {
-    return null;
+    return undefined;
   }
 
   if (cached.expiresAt < Date.now()) {
     replayCache.delete(uri);
-    return null;
+    return undefined;
   }
 
   return cached.data;
@@ -85,8 +86,7 @@ export async function fetchReplayData(
 
   if (replayResponse.err !== 0) {
     const errorMessage =
-      replayResponse.message ||
-      `Unknown error (code: ${replayResponse.err})`;
+      replayResponse.message || `Unknown error (code: ${replayResponse.err})`;
     throw new Error(`Rollbar API returned error: ${errorMessage}`);
   }
 
@@ -115,11 +115,11 @@ const readReplayResource: ReadResourceTemplateCallback = async (
   const cached = getCachedReplayData(resourceUri);
 
   const replayData =
-    cached !== null
+    cached !== undefined
       ? cached
       : await fetchReplayData(environment, sessionId, replayId);
 
-  if (cached === null) {
+  if (cached === undefined) {
     cacheReplayData(resourceUri, replayData);
   }
 
@@ -140,7 +140,7 @@ export function registerReplayResource(server: McpServer) {
   }
 
   const template = new ResourceTemplate(REPLAY_URI_TEMPLATE, {
-    list: async () => ({ resources: [] }),
+    list: () => ({ resources: [] }),
   });
 
   server.resource(

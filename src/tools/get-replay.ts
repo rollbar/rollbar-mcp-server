@@ -47,11 +47,7 @@ async function writeReplayToFile(
     .concat(".json");
 
   const filePath = path.join(REPLAY_FILE_DIRECTORY, fileName);
-  await writeFile(
-    filePath,
-    JSON.stringify(replayData, null, 2),
-    "utf8",
-  );
+  await writeFile(filePath, JSON.stringify(replayData, null, 2), "utf8");
   return filePath;
 }
 
