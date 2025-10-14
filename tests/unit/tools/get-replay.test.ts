@@ -1,11 +1,20 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { registerGetReplayTool } from '../../../src/tools/get-replay.js';
+import path from 'node:path';
+import { tmpdir } from 'node:os';
+import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { mockSuccessfulReplayResponse, mockErrorResponse } from '../../fixtures/rollbar-responses.js';
 import { buildReplayResourceUri } from '../../../src/resources/index.js';
 
+const mkdirMock = vi.fn();
+const writeFileMock = vi.fn();
+
 vi.mock('../../../src/utils/api.js', () => ({
   makeRollbarRequest: vi.fn()
+}));
+
+vi.mock('node:fs/promises', () => ({
+  mkdir: mkdirMock,
+  writeFile: writeFileMock
 }));
 
 vi.mock('../../../src/config.js', () => ({
@@ -17,10 +26,13 @@ describe('get-replay tool', () => {
   let server: McpServer;
   let toolHandler: any;
   let makeRollbarRequestMock: any;
+  let registerGetReplayTool: typeof import('../../../src/tools/get-replay.js')['registerGetReplayTool'];
 
   beforeEach(async () => {
     const { makeRollbarRequest } = await import('../../../src/utils/api.js');
     makeRollbarRequestMock = makeRollbarRequest as any;
+
+    ({ registerGetReplayTool } = await import('../../../src/tools/get-replay.js'));
 
     server = {
       tool: vi.fn((name, description, schema, handler) => {
@@ -33,6 +45,8 @@ describe('get-replay tool', () => {
 
   afterEach(() => {
     vi.clearAllMocks();
+    mkdirMock.mockReset();
+    writeFileMock.mockReset();
   });
 
   it('should register the tool with correct parameters', () => {
@@ -50,7 +64,8 @@ describe('get-replay tool', () => {
     const result = await toolHandler({
       environment: 'production',
       sessionId: 'session-123',
-      replayId: 'replay-456'
+      replayId: 'replay-456',
+      delivery: 'resource'
     });
 
     expect(makeRollbarRequestMock).toHaveBeenCalledWith(
@@ -75,6 +90,47 @@ describe('get-replay tool', () => {
       uri: expectedResourceUri,
       mimeType: 'application/json'
     });
+
+    expect(writeFileMock).not.toHaveBeenCalled();
+  });
+
+  it('should write replay data to a file by default', async () => {
+    makeRollbarRequestMock.mockResolvedValueOnce(mockSuccessfulReplayResponse);
+    const dateSpy = vi.spyOn(Date, 'now').mockReturnValue(1700000000000);
+    const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.123456789);
+
+    const result = await toolHandler({
+      environment: 'production',
+      sessionId: 'session-123',
+      replayId: 'replay-456'
+    });
+
+    const expectedDir = path.join(tmpdir(), 'rollbar-mcp-replays');
+    expect(mkdirMock).toHaveBeenCalledWith(expectedDir, { recursive: true });
+    expect(writeFileMock).toHaveBeenCalledTimes(1);
+
+    const [filePath, fileContents, encoding] = writeFileMock.mock.calls[0];
+    expect(filePath.startsWith(expectedDir + path.sep)).toBe(true);
+    expect(fileContents).toBe(JSON.stringify(mockSuccessfulReplayResponse.result, null, 2));
+    expect(encoding).toBe('utf8');
+    expect(result.content[0].text).toContain(filePath);
+    expect(result.content[0].text).toContain('not automatically deleted');
+
+    dateSpy.mockRestore();
+    randomSpy.mockRestore();
+  });
+
+  it('should allow delivery to be explicitly set to file', async () => {
+    makeRollbarRequestMock.mockResolvedValueOnce(mockSuccessfulReplayResponse);
+
+    await toolHandler({
+      environment: 'production',
+      sessionId: 'session-XYZ',
+      replayId: 'replay-ABC',
+      delivery: 'file'
+    });
+
+    expect(writeFileMock).toHaveBeenCalledTimes(1);
   });
 
   it('should encode URL components when necessary', async () => {

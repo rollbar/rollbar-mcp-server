@@ -25,7 +25,7 @@ This MCP server implementes the `stdio` server type, which means your AI tool (e
 
 `list-items(environment)`: List items filtered by status, environment and a search query.
 
-`get-replay(environment, sessionId, replayId)`: Retrieve session replay metadata and payload for a specific session in the configured project. The tool now returns a `rollbar://replay/<environment>/<sessionId>/<replayId>` resource link so clients can `read-resource` to download the full JSON payload without embedding large responses inline. Example prompt: `Fetch the replay 789 from session abc in staging` or `Download the replay data for session 456.`
+`get-replay(environment, sessionId, replayId, delivery?)`: Retrieve session replay metadata and payload for a specific session in the configured project. By default the tool writes the replay JSON to a temporary file (under your system temp directory) and returns the path so any client can inspect it. Set `delivery="resource"` to receive a `rollbar://replay/<environment>/<sessionId>/<replayId>` link for MCP-aware clients. Example prompt: `Fetch the replay 789 from session abc in staging`.
 
 `update-item(itemId, status?, level?, title?, assignedUserId?, resolvedInVersion?, snoozed?, teamId?)`: Update an item's properties including status, level, title, assignment, and more. Example prompt: `Mark Rollbar item #123456 as resolved` or `Assign item #123456 to user ID 789`. (Requires `write` scope)
 
