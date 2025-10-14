@@ -25,6 +25,8 @@ This MCP server implementes the `stdio` server type, which means your AI tool (e
 
 `list-items(environment)`: List items filtered by status, environment and a search query.
 
+`get-replay(environment, sessionId, replayId)`: Retrieve session replay metadata and payload for a specific session in the configured project. Example prompt: `Fetch the replay 789 from session abc in staging` or `Download the replay data for session 456.` (Supports large responses via compact JSON output.)
+
 `update-item(itemId, status?, level?, title?, assignedUserId?, resolvedInVersion?, snoozed?, teamId?)`: Update an item's properties including status, level, title, assignment, and more. Example prompt: `Mark Rollbar item #123456 as resolved` or `Assign item #123456 to user ID 789`. (Requires `write` scope)
 
 ## How to Use
@@ -110,4 +112,3 @@ Using npx (recommended):
 ```
 
 Or using a local development installation - see CONTRIBUTING.md.
-
