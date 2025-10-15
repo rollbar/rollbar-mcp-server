@@ -32,7 +32,9 @@ describe('config', () => {
 
   it('should have getUserAgent function that generates correct user agent string', async () => {
     const { getUserAgent } = await import('../../src/config.js');
-    expect(getUserAgent('test-tool')).toBe('rollbar-mcp-server/0.2.3 (tool: test-tool)');
+    const packageJsonModule = await import('../../package.json', { with: { type: 'json' } });
+    const expectedVersion = packageJsonModule.default.version;
+    expect(getUserAgent('test-tool')).toBe(`rollbar-mcp-server/${expectedVersion} (tool: test-tool)`);
   });
 
   it('should load access token from environment', async () => {

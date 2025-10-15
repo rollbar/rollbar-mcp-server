@@ -1,6 +1,6 @@
 {
   "name": "@rollbar/mcp-server",
-  "version": "0.2.3",
+  "version": "0.3.0",
   "description": "Model Context Protocol server for Rollbar",
   "repository": {
     "type": "git",
