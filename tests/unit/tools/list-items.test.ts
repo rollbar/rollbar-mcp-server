@@ -21,13 +21,13 @@ describe('list-items tool', () => {
     console.error = vi.fn();
     const { makeRollbarRequest } = await import('../../../src/utils/api.js');
     makeRollbarRequestMock = makeRollbarRequest as any;
-    
+
     server = {
       tool: vi.fn((name, description, schema, handler) => {
         toolHandler = handler;
       })
     } as any;
-    
+
     registerListItemsTool(server);
   });
 
@@ -59,7 +59,7 @@ describe('list-items tool', () => {
       'https://api.rollbar.com/api/1/items/?status=active&environment=production',
       'list-items'
     );
-    
+
     const responseData = JSON.parse(result.content[0].text);
     expect(responseData.items).toHaveLength(1);
     expect(responseData.pagination).toEqual({
@@ -90,7 +90,7 @@ describe('list-items tool', () => {
       'https://api.rollbar.com/api/1/items/?status=resolved&level=error&level=critical&environment=staging&page=2&q=TypeError',
       'list-items'
     );
-    
+
     const responseData = JSON.parse(result.content[0].text);
     expect(responseData.filters_applied).toEqual({
       status: 'resolved',
@@ -139,26 +139,33 @@ describe('list-items tool', () => {
   it('should validate parameter schemas with Zod', () => {
     const schemaCall = (server.tool as any).mock.calls[0];
     const schema = schemaCall[2];
-    
+
     // Test status parameter
     expect(schema.status.parse(undefined)).toBe('active'); // default
     expect(schema.status.parse('resolved')).toBe('resolved');
-    
+
     // Test level parameter
     expect(schema.level.parse(undefined)).toBeUndefined(); // optional
     expect(schema.level.parse(['error', 'warning'])).toEqual(['error', 'warning']);
     expect(() => schema.level.parse('error')).toThrow(); // must be array
-    
+
     // Test environment parameter
     expect(schema.environment.parse(undefined)).toBe('production'); // default
     expect(schema.environment.parse('staging')).toBe('staging');
-    
+
     // Test page parameter
     expect(schema.page.parse(undefined)).toBe(1); // default
     expect(schema.page.parse(5)).toBe(5);
     expect(() => schema.page.parse(0)).toThrow(); // min is 1
     expect(() => schema.page.parse(3.14)).toThrow(); // must be int
-    
+
+    // Test limit parameter
+    expect(schema.limit.parse(undefined)).toBe(20); // default
+    expect(schema.limit.parse(50)).toBe(50);
+    expect(() => schema.limit.parse(0)).toThrow(); // min is 1
+    expect(() => schema.limit.parse(5001)).toThrow(); // max is 5000
+    expect(() => schema.limit.parse(2.5)).toThrow(); // must be int
+
     // Test query parameter
     expect(schema.query.parse(undefined)).toBeUndefined(); // optional
     expect(schema.query.parse('search term')).toBe('search term');
