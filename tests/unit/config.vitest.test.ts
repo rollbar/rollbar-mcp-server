@@ -13,6 +13,7 @@ describe('config', () => {
 
   beforeEach(() => {
     process.env = { ...originalEnv, ROLLBAR_ACCESS_TOKEN: 'test-token' };
+    delete process.env.ROLLBAR_API_BASE;
     process.exit = vi.fn() as any;
     console.error = vi.fn();
     vi.resetModules();
@@ -28,6 +29,13 @@ describe('config', () => {
   it('should have correct API base URL', async () => {
     const { ROLLBAR_API_BASE } = await import('../../src/config.js');
     expect(ROLLBAR_API_BASE).toBe('https://api.rollbar.com/api/1');
+  });
+
+  it('should allow overriding API base URL via environment variable', async () => {
+    process.env.ROLLBAR_API_BASE = 'https://rollbar-dev.example.com/api/1/';
+    vi.resetModules();
+    const { ROLLBAR_API_BASE } = await import('../../src/config.js');
+    expect(ROLLBAR_API_BASE).toBe('https://rollbar-dev.example.com/api/1');
   });
 
   it('should have getUserAgent function that generates correct user agent string', async () => {
@@ -50,6 +58,18 @@ describe('config', () => {
 
     expect(console.error).toHaveBeenCalledWith(
       'Error: ROLLBAR_ACCESS_TOKEN is not set in env var or .env file'
+    );
+    expect(process.exit).toHaveBeenCalledWith(1);
+  });
+
+  it('should exit when ROLLBAR_API_BASE is invalid', async () => {
+    process.env.ROLLBAR_API_BASE = 'not-a-valid-url';
+    vi.resetModules();
+
+    await import('../../src/config.js');
+
+    expect(console.error).toHaveBeenCalledWith(
+      'Error: ROLLBAR_API_BASE must be a valid HTTP(S) URL. Received "not-a-valid-url".'
     );
     expect(process.exit).toHaveBeenCalledWith(1);
   });

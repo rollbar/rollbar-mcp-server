@@ -11,7 +11,8 @@ This MCP server implementes the `stdio` server type, which means your AI tool (e
 
 ### Configuration
 
-`ROLLBAR_ACCESS_TOKEN`: an access token for your Rollbar project with `read` and/or `write` scope.
+- `ROLLBAR_ACCESS_TOKEN`: an access token for your Rollbar project with `read` and/or `write` scope.
+- `ROLLBAR_API_BASE` (optional): override the Rollbar API base URL (defaults to `https://api.rollbar.com/api/1`). Use this when running against a staging or development Rollbar deployment.
 
 ### Tools
 
@@ -54,6 +55,8 @@ Configure your `.mcp.json` as follows:
   }
 }
 ```
+
+Optionally include `ROLLBAR_API_BASE` in the `env` block to target a non-production API endpoint, for example `"ROLLBAR_API_BASE": "https://rollbar-dev.example.com/api/1"`.
 
 
 ### Codex CLI

@@ -30,6 +30,8 @@ Run your local installation from Claude Code:
 }
 ```
 
+Add `ROLLBAR_API_BASE` to the `env` map if you need to point the server at a custom Rollbar API endpoint (for example, `"ROLLBAR_API_BASE": "https://rollbar-dev.example.com/api/1"`).
+
 Run your local installation from VSCode:
 
 ```
