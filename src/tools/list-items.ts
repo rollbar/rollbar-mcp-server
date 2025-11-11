@@ -39,6 +39,14 @@ export function registerListItemsTool(server: McpServer) {
         .optional()
         .default(1)
         .describe("Page number for pagination (default: 1)"),
+      limit: z
+        .number()
+        .int()
+        .min(1)
+        .max(5000)
+        .optional()
+        .default(20)
+        .describe("Number of items per page (default: 20, max: 5000)"),
       query: z
         .string()
         .optional()
@@ -49,12 +57,14 @@ export function registerListItemsTool(server: McpServer) {
       level,
       environment,
       page,
+      limit,
       query,
     }: {
       status?: string;
       level?: string[];
       environment?: string;
       page?: number;
+      limit?: number;
       query?: string;
     }) => {
       // Build query parameters
@@ -74,6 +84,10 @@ export function registerListItemsTool(server: McpServer) {
 
       if (page && page > 1) {
         params.append("page", page.toString());
+      }
+
+      if (limit) {
+        params.append("limit", limit.toString());
       }
 
       if (query) {
