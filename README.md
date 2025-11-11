@@ -2,9 +2,6 @@
 
 A Model Context Protocol (MCP) server for [Rollbar](https://rollbar.com).
 
-> [!NOTE]
-> This software is alpha quality and under active development.
-
 ## Features
 
 This MCP server implementes the `stdio` server type, which means your AI tool (e.g. Claude) will run it directly; you don't run a separate process or connect over http.
