@@ -33,6 +33,14 @@ const server = new McpServer({
       "get-replay": {
         description: "Get replay data for a specific session replay in Rollbar",
       },
+      "list-projects": {
+        description:
+          "List configured Rollbar projects available in this MCP server",
+      },
+      "update-item": {
+        description:
+          "Update the status, level, title, or assignment of a Rollbar item",
+      },
     },
   },
 });

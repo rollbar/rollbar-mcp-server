@@ -8,8 +8,19 @@ vi.mock('../../../src/utils/api.js', () => ({
 }));
 
 vi.mock('../../../src/config.js', () => ({
-  ROLLBAR_API_BASE: 'https://api.rollbar.com/api/1',
-  ROLLBAR_ACCESS_TOKEN: 'test-token'
+  PROJECTS: [
+    {
+      name: 'default',
+      token: 'test-token',
+      apiBase: 'https://api.rollbar.com/api/1',
+    },
+  ],
+  resolveProject: vi.fn(() => ({
+    name: 'default',
+    token: 'test-token',
+    apiBase: 'https://api.rollbar.com/api/1',
+  })),
+  getUserAgent: (toolName: string) => `rollbar-mcp-server/test (tool: ${toolName})`,
 }));
 
 vi.mock('../../../src/utils/truncation.js', () => ({
@@ -60,7 +71,8 @@ describe('get-item-details tool', () => {
       'Get item details for a Rollbar item',
       expect.objectContaining({
         counter: expect.any(Object),
-        max_tokens: expect.any(Object)
+        max_tokens: expect.any(Object),
+        project: expect.any(Object),
       }),
       expect.any(Function)
     );
@@ -71,15 +83,17 @@ describe('get-item-details tool', () => {
       .mockResolvedValueOnce(mockSuccessfulItemResponse)
       .mockResolvedValueOnce(mockSuccessfulOccurrenceResponse);
 
-    const result = await toolHandler({ counter: 42 });
+    const result = await toolHandler({ counter: 42, project: undefined });
 
     expect(makeRollbarRequestMock).toHaveBeenCalledWith(
       'https://api.rollbar.com/api/1/item_by_counter/42',
-      'get-item-details'
+      'get-item-details',
+      'test-token'
     );
     expect(makeRollbarRequestMock).toHaveBeenCalledWith(
       'https://api.rollbar.com/api/1/instance/999',
-      'get-item-details'
+      'get-item-details',
+      'test-token'
     );
     
     const responseData = JSON.parse(result.content[0].text);
@@ -281,6 +295,22 @@ describe('get-item-details tool', () => {
       expect(responseData).toEqual(mockSuccessfulItemResponse.result);
       expect(responseData.occurrence).toBeUndefined();
     });
+  });
+
+  it('should resolve project when project param is explicitly default', async () => {
+    makeRollbarRequestMock
+      .mockResolvedValueOnce(mockSuccessfulItemResponse)
+      .mockResolvedValueOnce(mockSuccessfulOccurrenceResponse);
+
+    const result = await toolHandler({ counter: 42, project: 'default' });
+
+    expect(makeRollbarRequestMock).toHaveBeenCalledWith(
+      'https://api.rollbar.com/api/1/item_by_counter/42',
+      'get-item-details',
+      'test-token'
+    );
+    const responseData = JSON.parse(result.content[0].text);
+    expect(responseData).toHaveProperty('counter', 42);
   });
 
   it('should validate max_tokens parameter with Zod schema', () => {

@@ -1,7 +1,8 @@
 import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { ROLLBAR_API_BASE } from "../config.js";
+import { resolveProject } from "../config.js";
 import { makeRollbarRequest } from "../utils/api.js";
+import { buildProjectParam } from "../utils/project-params.js";
 import { RollbarApiResponse, RollbarTopItemResponse } from "../types/index.js";
 
 export function registerGetTopItemsTool(server: McpServer) {
@@ -13,12 +14,14 @@ export function registerGetTopItemsTool(server: McpServer) {
         .string()
         .default("production")
         .describe("Environment name (default: production)"),
+      project: buildProjectParam(),
     },
-    async ({ environment }) => {
-      const reportUrl = `${ROLLBAR_API_BASE}/reports/top_active_items?hours=24&environments=${environment}&sort=occurrences`;
+    async ({ environment, project }) => {
+      const { token, apiBase } = resolveProject(project);
+      const reportUrl = `${apiBase}/reports/top_active_items?hours=24&environments=${environment}&sort=occurrences`;
       const reportResponse = await makeRollbarRequest<
         RollbarApiResponse<RollbarTopItemResponse>
-      >(reportUrl, "get-top-items");
+      >(reportUrl, "get-top-items", token);
 
       if (reportResponse.err !== 0) {
         const errorMessage =

@@ -8,8 +8,18 @@ vi.mock('../../../src/utils/api.js', () => ({
 }));
 
 vi.mock('../../../src/config.js', () => ({
-  ROLLBAR_API_BASE: 'https://api.rollbar.com/api/1',
-  ROLLBAR_ACCESS_TOKEN: 'test-token'
+  PROJECTS: [
+    {
+      name: 'default',
+      token: 'test-token',
+      apiBase: 'https://api.rollbar.com/api/1',
+    },
+  ],
+  resolveProject: vi.fn(() => ({
+    name: 'default',
+    token: 'test-token',
+    apiBase: 'https://api.rollbar.com/api/1',
+  })),
 }));
 
 let makeRollbarRequestMock: any;
@@ -137,5 +147,33 @@ describe('read replay resource handler', () => {
         replayId
       })
     ).rejects.toThrow('Invalid replay resource URI');
+  });
+
+  it('throws when PROJECTS.length > 1 with message to use get-replay tool', async () => {
+    vi.resetModules();
+    vi.doMock('../../../src/config.js', () => ({
+      PROJECTS: [
+        { name: 'backend', token: 't1', apiBase: 'https://api.rollbar.com/api/1' },
+        { name: 'frontend', token: 't2', apiBase: 'https://api.rollbar.com/api/1' },
+      ],
+      resolveProject: vi.fn(),
+    }));
+    const replayMod = await import('../../../src/resources/replay-resource.js');
+    let multiProjectReadCallback: typeof readCallback;
+    const resourceSpy2 = vi.fn((_n: string, _t: unknown, _m: unknown, handler: unknown) => {
+      multiProjectReadCallback = handler as typeof readCallback;
+    });
+    const server2 = { resource: resourceSpy2 } as any;
+    replayMod.registerReplayResource(server2);
+
+    const uri = new URL(replayUri);
+    await expect(
+      multiProjectReadCallback!(uri, { environment, sessionId, replayId })
+    ).rejects.toThrow(
+      'Direct replay resource access is not supported when multiple projects are configured'
+    );
+    await expect(
+      multiProjectReadCallback!(uri, { environment, sessionId, replayId })
+    ).rejects.toThrow('get-replay tool');
   });
 });

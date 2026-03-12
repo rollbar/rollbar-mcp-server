@@ -8,8 +8,19 @@ vi.mock('../../../src/utils/api.js', () => ({
 }));
 
 vi.mock('../../../src/config.js', () => ({
-  ROLLBAR_API_BASE: 'https://api.rollbar.com/api/1',
-  ROLLBAR_ACCESS_TOKEN: 'test-token'
+  PROJECTS: [
+    {
+      name: 'default',
+      token: 'test-token',
+      apiBase: 'https://api.rollbar.com/api/1',
+    },
+  ],
+  resolveProject: vi.fn(() => ({
+    name: 'default',
+    token: 'test-token',
+    apiBase: 'https://api.rollbar.com/api/1',
+  })),
+  getUserAgent: (toolName: string) => `rollbar-mcp-server/test (tool: ${toolName})`,
 }));
 
 describe('list-items tool', () => {
@@ -44,7 +55,8 @@ describe('list-items tool', () => {
         level: expect.any(Object),
         environment: expect.any(Object),
         page: expect.any(Object),
-        query: expect.any(Object)
+        query: expect.any(Object),
+        project: expect.any(Object),
       }),
       expect.any(Function)
     );
@@ -57,7 +69,8 @@ describe('list-items tool', () => {
 
     expect(makeRollbarRequestMock).toHaveBeenCalledWith(
       'https://api.rollbar.com/api/1/items/?status=active&environment=production',
-      'list-items'
+      'list-items',
+      'test-token'
     );
 
     const responseData = JSON.parse(result.content[0].text);
@@ -88,7 +101,8 @@ describe('list-items tool', () => {
 
     expect(makeRollbarRequestMock).toHaveBeenCalledWith(
       'https://api.rollbar.com/api/1/items/?status=resolved&level=error&level=critical&environment=staging&page=2&q=TypeError',
-      'list-items'
+      'list-items',
+      'test-token'
     );
 
     const responseData = JSON.parse(result.content[0].text);
@@ -107,7 +121,20 @@ describe('list-items tool', () => {
 
     expect(makeRollbarRequestMock).toHaveBeenCalledWith(
       'https://api.rollbar.com/api/1/items/?status=active&environment=production',
-      'list-items'
+      'list-items',
+      'test-token'
+    );
+  });
+
+  it('should work with explicit project default', async () => {
+    makeRollbarRequestMock.mockResolvedValueOnce(mockSuccessfulListItemsResponse);
+
+    await toolHandler({ status: 'active', environment: 'production', project: 'default' });
+
+    expect(makeRollbarRequestMock).toHaveBeenCalledWith(
+      'https://api.rollbar.com/api/1/items/?status=active&environment=production',
+      'list-items',
+      'test-token'
     );
   });
 
@@ -196,7 +223,8 @@ describe('list-items tool', () => {
 
     expect(makeRollbarRequestMock).toHaveBeenCalledWith(
       'https://api.rollbar.com/api/1/items/?status=active&environment=production',
-      'list-items'
+      'list-items',
+      'test-token'
     );
   });
 

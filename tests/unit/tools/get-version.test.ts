@@ -8,8 +8,19 @@ vi.mock('../../../src/utils/api.js', () => ({
 }));
 
 vi.mock('../../../src/config.js', () => ({
-  ROLLBAR_API_BASE: 'https://api.rollbar.com/api/1',
-  ROLLBAR_ACCESS_TOKEN: 'test-token'
+  PROJECTS: [
+    {
+      name: 'default',
+      token: 'test-token',
+      apiBase: 'https://api.rollbar.com/api/1',
+    },
+  ],
+  resolveProject: vi.fn(() => ({
+    name: 'default',
+    token: 'test-token',
+    apiBase: 'https://api.rollbar.com/api/1',
+  })),
+  getUserAgent: (toolName: string) => `rollbar-mcp-server/test (tool: ${toolName})`,
 }));
 
 describe('get-version tool', () => {
@@ -41,7 +52,8 @@ describe('get-version tool', () => {
       'Get version details for a Rollbar project',
       expect.objectContaining({
         version: expect.any(Object),
-        environment: expect.any(Object)
+        environment: expect.any(Object),
+        project: expect.any(Object),
       }),
       expect.any(Function)
     );
@@ -54,7 +66,8 @@ describe('get-version tool', () => {
 
     expect(makeRollbarRequestMock).toHaveBeenCalledWith(
       'https://api.rollbar.com/api/1/versions/v1.2.3?environment=staging',
-      'get-version'
+      'get-version',
+      'test-token'
     );
     expect(result.content[0].type).toBe('text');
     const parsed = JSON.parse(result.content[0].text);
@@ -69,7 +82,8 @@ describe('get-version tool', () => {
 
     expect(makeRollbarRequestMock).toHaveBeenCalledWith(
       'https://api.rollbar.com/api/1/versions/abc123?environment=production',
-      'get-version'
+      'get-version',
+      'test-token'
     );
   });
 
@@ -145,7 +159,24 @@ describe('get-version tool', () => {
 
     expect(makeRollbarRequestMock).toHaveBeenCalledWith(
       'https://api.rollbar.com/api/1/versions/git-sha-abc123?environment=development',
-      'get-version'
+      'get-version',
+      'test-token'
+    );
+  });
+
+  it('should work with explicit project default', async () => {
+    makeRollbarRequestMock.mockResolvedValueOnce(mockSuccessfulVersionResponse);
+
+    await toolHandler({
+      version: 'v1',
+      environment: 'production',
+      project: 'default',
+    });
+
+    expect(makeRollbarRequestMock).toHaveBeenCalledWith(
+      'https://api.rollbar.com/api/1/versions/v1?environment=production',
+      'get-version',
+      'test-token'
     );
   });
 });

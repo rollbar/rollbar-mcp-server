@@ -1,4 +1,5 @@
 .env
+.rollbar-mcp.json
 
 node_modules/
 build/
