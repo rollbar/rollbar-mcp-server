@@ -15,7 +15,7 @@ This MCP server implements the `stdio` server type, which means your AI tool (e.
 
 **Multiple Project: Config file (single or multiple projects)**
 
-Create `.rollbar-mcp.json` in your working directory or home directory, or set `ROLLBAR_CONFIG_FILE` to point to a custom path.
+Create `.rollbar-mcp.json` in your working directory or home directory, or set `ROLLBAR_CONFIG_FILE` to point to a custom path. A checked-in template is available at `rollbar-mcp-example.json`; copy it to `.rollbar-mcp.json` and fill in your real tokens.
 
 Single project shorthand:
 
@@ -42,6 +42,8 @@ Config file lookup order:
 3. `~/.rollbar-mcp.json` in home directory
 4. `ROLLBAR_ACCESS_TOKEN` env var (single project, backward compatible)
 
+If a config file exists but is invalid, the server exits with an error instead of falling back to a lower-priority config source.
+
 ### Tools
 
 `list-projects()`: List configured Rollbar projects (names and apiBase only; tokens are never returned). Use this when multiple projects are configured to see which project names you can pass to other tools.
@@ -56,7 +58,7 @@ Config file lookup order:
 
 `list-items(status?, level?, environment?, page?, limit?, query?, project?)`: List items filtered by status, environment, and search query. Optional `project` when multiple projects are configured.
 
-`get-replay(environment, sessionId, replayId, delivery?, project?)`: Retrieve session replay metadata and payload for a specific session. By default the tool writes the replay JSON to a temporary file (under your system temp directory) and returns the path. Set `delivery="resource"` to receive a `rollbar://replay/<environment>/<sessionId>/<replayId>` link for MCP-aware clients. Optional `project` when multiple projects are configured. When multiple projects are configured, direct `rollbar://replay/...` resource reads are not supported—use this tool with a `project` parameter instead. Example prompt: `Fetch the replay 789 from session abc in staging`.
+`get-replay(environment, sessionId, replayId, delivery?, project?)`: Retrieve session replay metadata and payload for a specific session. By default the tool writes the replay JSON to a temporary file (under your system temp directory) and returns the path. Set `delivery="resource"` to receive a `rollbar://replay/<environment>/<sessionId>/<replayId>` link for MCP-aware clients. Optional `project` when multiple projects are configured. `delivery="resource"` is only supported in single-project mode; when multiple projects are configured, use `delivery="file"` with a `project` parameter instead. Example prompt: `Fetch the replay 789 from session abc in staging`.
 
 `update-item(itemId, status?, level?, title?, assignedUserId?, resolvedInVersion?, snoozed?, teamId?, project?)`: Update an item's properties including status, level, title, assignment, and more. Optional `project` when multiple projects are configured. Example prompt: `Mark Rollbar item #123456 as resolved` or `Assign item #123456 to user ID 789`. (Requires `write` scope)
 

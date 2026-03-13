@@ -129,6 +129,21 @@ describe("config", () => {
     expect(PROJECTS[0].apiBase).toBe("https://api.example.com/api/1");
   });
 
+  it("should exit when ROLLBAR_CONFIG_FILE points to invalid JSON", async () => {
+    process.env.ROLLBAR_CONFIG_FILE = "/custom/config.json";
+    delete process.env.ROLLBAR_ACCESS_TOKEN;
+    existsSyncMock.mockImplementation((p: string) => p === "/custom/config.json");
+    readFileSyncMock.mockReturnValue("{ invalid json");
+    vi.resetModules();
+
+    await import("../../src/config.js");
+
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringContaining('Invalid Rollbar config file "/custom/config.json"'),
+    );
+    expect(process.exit).toHaveBeenCalledWith(1);
+  });
+
   it("accepts multi-project config and sets PROJECTS with correct name/token/apiBase", async () => {
     delete process.env.ROLLBAR_ACCESS_TOKEN;
     existsSyncMock.mockImplementation((p: string) =>
@@ -177,6 +192,110 @@ describe("config", () => {
     expect(PROJECTS[0].name).toBe("default");
     expect(PROJECTS[0].token).toBe("tok_single");
     expect(PROJECTS[0].apiBase).toBe("https://api.rollbar.com/api/1");
+  });
+
+  it("accepts harmless extra metadata keys in config files", async () => {
+    delete process.env.ROLLBAR_ACCESS_TOKEN;
+    existsSyncMock.mockImplementation((p: string) =>
+      p.endsWith(".rollbar-mcp.json"),
+    );
+    readFileSyncMock.mockReturnValue(
+      JSON.stringify({
+        description: "internal metadata",
+        projects: [
+          {
+            name: "backend",
+            token: "tok_backend",
+            environment: "production",
+            internalId: 123,
+          },
+        ],
+      }),
+    );
+    vi.resetModules();
+
+    const { PROJECTS } = await import("../../src/config.js");
+
+    expect(PROJECTS).toHaveLength(1);
+    expect(PROJECTS[0]).toEqual({
+      name: "backend",
+      token: "tok_backend",
+      apiBase: "https://api.rollbar.com/api/1",
+    });
+  });
+
+  it("should exit when config apiBase is not HTTP(S)", async () => {
+    delete process.env.ROLLBAR_ACCESS_TOKEN;
+    existsSyncMock.mockImplementation((p: string) =>
+      p.endsWith(".rollbar-mcp.json"),
+    );
+    readFileSyncMock.mockReturnValue(
+      JSON.stringify({
+        projects: [
+          {
+            name: "backend",
+            token: "tok_backend",
+            apiBase: "ftp://example.com/api/1",
+          },
+        ],
+      }),
+    );
+    vi.resetModules();
+
+    await import("../../src/config.js");
+
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringContaining("Invalid Rollbar config file"),
+    );
+    expect(process.exit).toHaveBeenCalledWith(1);
+  });
+
+  it("should exit when cwd config exists but is invalid instead of falling back to env", async () => {
+    existsSyncMock.mockImplementation((p: string) => p.endsWith(".rollbar-mcp.json"));
+    readFileSyncMock.mockReturnValue(JSON.stringify({ projects: "not-an-array" }));
+    vi.resetModules();
+
+    await import("../../src/config.js");
+
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringContaining("Invalid Rollbar config file"),
+    );
+    expect(process.exit).toHaveBeenCalledWith(1);
+  });
+
+  it("should exit when home config exists but is invalid instead of falling back to env", async () => {
+    existsSyncMock.mockImplementation(
+      (p: string) =>
+        p.endsWith(".rollbar-mcp.json") && !p.startsWith(process.cwd()),
+    );
+    readFileSyncMock.mockReturnValue("{ invalid json");
+    vi.resetModules();
+
+    await import("../../src/config.js");
+
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringContaining("Invalid Rollbar config file"),
+    );
+    expect(process.exit).toHaveBeenCalledWith(1);
+  });
+
+  it("should exit when shorthand and multi-project fields are both present", async () => {
+    delete process.env.ROLLBAR_ACCESS_TOKEN;
+    existsSyncMock.mockImplementation((p: string) => p.endsWith(".rollbar-mcp.json"));
+    readFileSyncMock.mockReturnValue(
+      JSON.stringify({
+        token: "tok_single",
+        projects: [{ name: "backend", token: "tok_backend" }],
+      }),
+    );
+    vi.resetModules();
+
+    await import("../../src/config.js");
+
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringContaining("expected either a single-project config"),
+    );
+    expect(process.exit).toHaveBeenCalledWith(1);
   });
 
   it("falls back to ROLLBAR_ACCESS_TOKEN when no config file is present", async () => {

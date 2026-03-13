@@ -1,0 +1,13 @@
+{
+  "projects": [
+    {
+      "name": "backend",
+      "token": "tok_backend_example",
+      "apiBase": "https://api.rollbar.com/api/1"
+    },
+    {
+      "name": "frontend",
+      "token": "tok_frontend_example"
+    }
+  ]
+}

@@ -11,21 +11,46 @@ dotenv.config({ quiet: true } as Parameters<typeof dotenv.config>[0]);
 
 const DEFAULT_ROLLBAR_API_BASE = "https://api.rollbar.com/api/1";
 
-const ProjectConfigSchema = z.object({
-  name: z.string().min(1),
-  token: z.string().min(1),
-  apiBase: z.string().url().optional(),
-});
+const HttpUrlSchema = z
+  .string()
+  .url()
+  .refine((value) => {
+    try {
+      const parsedUrl = new URL(value);
+      return ["https:", "http:"].includes(parsedUrl.protocol);
+    } catch {
+      return false;
+    }
+  }, "Must be a valid HTTP(S) URL");
 
-const RollbarMcpConfigSchema = z.object({
-  projects: z.array(ProjectConfigSchema).min(1),
-});
+const ProjectConfigSchema = z
+  .object({
+    name: z.string().min(1),
+    token: z.string().min(1),
+    apiBase: HttpUrlSchema.optional(),
+  })
+  .passthrough();
+
+const RollbarMcpConfigSchema = z
+  .object({
+    projects: z.array(ProjectConfigSchema).min(1),
+  })
+  .passthrough()
+  .refine((value) => !("token" in value) && !("apiBase" in value), {
+    message:
+      'Top-level "token" and "apiBase" are not allowed when "projects" is present.',
+  });
 
 // Single project shorthand (no name, no projects array)
-const RollbarMcpConfigShorthandSchema = z.object({
-  token: z.string().min(1),
-  apiBase: z.string().url().optional(),
-});
+const RollbarMcpConfigShorthandSchema = z
+  .object({
+    token: z.string().min(1),
+    apiBase: HttpUrlSchema.optional(),
+  })
+  .passthrough()
+  .refine((value) => !("projects" in value), {
+    message: '"projects" is not allowed in single-project shorthand config.',
+  });
 
 export interface ProjectConfig {
   name: string;
@@ -57,54 +82,55 @@ function normalizeApiBase(value: string | undefined): string {
   if (!value || value.length === 0) {
     return DEFAULT_ROLLBAR_API_BASE;
   }
-  const sanitized = value.replace(/\/+$/, "");
-  if (sanitized.length === 0) {
-    return DEFAULT_ROLLBAR_API_BASE;
-  }
-  try {
-    const parsedUrl = new URL(sanitized);
-    if (!["https:", "http:"].includes(parsedUrl.protocol)) {
-      return DEFAULT_ROLLBAR_API_BASE;
-    }
-    return sanitized;
-  } catch {
-    return DEFAULT_ROLLBAR_API_BASE;
-  }
+  return value.replace(/\/+$/, "");
 }
 
 function loadProjectsFromFile(filePath: string): ProjectConfig[] | null {
   if (!existsSync(filePath)) {
     return null;
   }
+
+  let json: unknown;
+
   try {
     const raw = readFileSync(filePath, "utf-8");
-    const json = JSON.parse(raw) as unknown;
-
-    // Try shorthand first
-    const shorthand = RollbarMcpConfigShorthandSchema.safeParse(json);
-    if (shorthand.success) {
-      const apiBase = normalizeApiBase(shorthand.data.apiBase);
-      return [
-        {
-          name: "default",
-          token: shorthand.data.token,
-          apiBase,
-        },
-      ];
-    }
-
-    const multi = RollbarMcpConfigSchema.safeParse(json);
-    if (multi.success) {
-      return multi.data.projects.map((p) => ({
-        name: p.name,
-        token: p.token,
-        apiBase: normalizeApiBase(p.apiBase),
-      }));
-    }
-  } catch {
-    // Invalid JSON or read error
+    json = JSON.parse(raw) as unknown;
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Unknown JSON parse error";
+    throw new Error(`Invalid Rollbar config file "${filePath}": ${message}`);
   }
-  return null;
+
+  const multi = RollbarMcpConfigSchema.safeParse(json);
+  if (multi.success) {
+    return multi.data.projects.map((p) => ({
+      name: p.name,
+      token: p.token,
+      apiBase: normalizeApiBase(p.apiBase),
+    }));
+  }
+
+  const shorthand = RollbarMcpConfigShorthandSchema.safeParse(json);
+  if (shorthand.success) {
+    const apiBase = normalizeApiBase(shorthand.data.apiBase);
+    return [
+      {
+        name: "default",
+        token: shorthand.data.token,
+        apiBase,
+      },
+    ];
+  }
+
+  throw new Error(
+    `Invalid Rollbar config file "${filePath}": expected either a single-project config like { "token": "..." } or a multi-project config like { "projects": [...] }.`,
+  );
+}
+
+function exitWithError(message: string): never {
+  console.error(message);
+  process.exit(1);
+  return undefined as never;
 }
 
 function loadConfig(): ProjectConfig[] {
@@ -114,35 +140,51 @@ function loadConfig(): ProjectConfig[] {
     const resolved = path.isAbsolute(configFileEnv)
       ? configFileEnv
       : path.resolve(process.cwd(), configFileEnv);
-    const projects = loadProjectsFromFile(resolved);
-    if (projects) {
-      return projects;
+    try {
+      const projects = loadProjectsFromFile(resolved);
+      if (projects) {
+        return projects;
+      }
+    } catch (error) {
+      return exitWithError(
+        error instanceof Error ? error.message : "Invalid Rollbar config file",
+      );
     }
-    console.error(
-      `Error: ROLLBAR_CONFIG_FILE="${configFileEnv}" not found or invalid`,
+    return exitWithError(
+      `Error: ROLLBAR_CONFIG_FILE="${configFileEnv}" was not found.`,
     );
-    process.exit(1);
   }
 
   // 2. .rollbar-mcp.json in process.cwd()
   const cwdPath = path.join(process.cwd(), ".rollbar-mcp.json");
-  const fromCwd = loadProjectsFromFile(cwdPath);
-  if (fromCwd) return fromCwd;
+  try {
+    const fromCwd = loadProjectsFromFile(cwdPath);
+    if (fromCwd) return fromCwd;
+  } catch (error) {
+    return exitWithError(
+      error instanceof Error ? error.message : "Invalid Rollbar config file",
+    );
+  }
 
   // 3. ~/.rollbar-mcp.json
   const homePath = path.join(homedir(), ".rollbar-mcp.json");
-  const fromHome = loadProjectsFromFile(homePath);
-  if (fromHome) return fromHome;
+  try {
+    const fromHome = loadProjectsFromFile(homePath);
+    if (fromHome) return fromHome;
+  } catch (error) {
+    return exitWithError(
+      error instanceof Error ? error.message : "Invalid Rollbar config file",
+    );
+  }
 
   // 4. ROLLBAR_ACCESS_TOKEN env var — synthesize single project
   const token = process.env.ROLLBAR_ACCESS_TOKEN?.trim();
   if (token && token.length > 0) {
     const apiBase = resolveApiBaseFromEnv();
     if (apiBase === null) {
-      console.error(
+      return exitWithError(
         "Error: ROLLBAR_API_BASE must be a valid HTTP(S) URL when using ROLLBAR_ACCESS_TOKEN.",
       );
-      process.exit(1);
     }
     return [
       {
@@ -153,10 +195,9 @@ function loadConfig(): ProjectConfig[] {
     ];
   }
 
-  console.error(
+  return exitWithError(
     "Error: No Rollbar configuration found. Set ROLLBAR_ACCESS_TOKEN, or create .rollbar-mcp.json (in cwd or home), or set ROLLBAR_CONFIG_FILE.",
   );
-  process.exit(1);
 }
 
 export const PROJECTS: ProjectConfig[] = loadConfig();

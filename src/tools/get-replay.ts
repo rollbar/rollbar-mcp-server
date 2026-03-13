@@ -3,7 +3,7 @@ import path from "node:path";
 import { tmpdir } from "node:os";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { resolveProject } from "../config.js";
+import { PROJECTS, resolveProject } from "../config.js";
 import { buildProjectParam } from "../utils/project-params.js";
 import {
   buildReplayResourceUri,
@@ -75,6 +75,12 @@ export function registerGetReplayTool(server: McpServer) {
     async ({ environment, sessionId, replayId, delivery, project }) => {
       const deliveryMode = delivery ?? "file";
       const { token, apiBase } = resolveProject(project);
+
+      if (deliveryMode === "resource" && PROJECTS.length > 1) {
+        throw new Error(
+          'delivery="resource" is not supported when multiple projects are configured. Use delivery="file" and specify the project parameter instead.',
+        );
+      }
 
       const replayData = await fetchReplayData(
         environment,
