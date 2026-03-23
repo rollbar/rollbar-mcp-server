@@ -30,8 +30,9 @@ Multiple projects:
   "projects": [
     { "name": "backend",  "token": "tok_abc123" },
     { "name": "frontend", "token": "tok_xyz789" },
-    { "name": "staging",  "token": "tok_stg456", "apiBase": "https://rollbar-staging.example.com/api/1" }
-  ]
+    { "name": "staging",  "token": "tok_stg456" }
+  ],
+  "apiBase": "https://rollbar-staging.example.com/api/1"
 }
 ```
 

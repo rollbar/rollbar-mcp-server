@@ -110,11 +110,11 @@ describe("config", () => {
     existsSyncMock.mockImplementation((p: string) => p === "/custom/config.json");
     readFileSyncMock.mockReturnValue(
       JSON.stringify({
+        apiBase: "https://api.example.com/api/1",
         projects: [
           {
             name: "backend",
             token: "tok_abc",
-            apiBase: "https://api.example.com/api/1",
           },
         ],
       }),
@@ -151,13 +151,10 @@ describe("config", () => {
     );
     readFileSyncMock.mockReturnValue(
       JSON.stringify({
+        apiBase: "https://staging.rollbar.com/api/1",
         projects: [
           { name: "backend", token: "tok_1" },
-          {
-            name: "staging",
-            token: "tok_2",
-            apiBase: "https://staging.rollbar.com/api/1",
-          },
+          { name: "staging", token: "tok_2" },
         ],
       }),
     );
@@ -169,7 +166,7 @@ describe("config", () => {
     expect(PROJECTS[0]).toEqual({
       name: "backend",
       token: "tok_1",
-      apiBase: "https://api.rollbar.com/api/1",
+      apiBase: "https://staging.rollbar.com/api/1",
     });
     expect(PROJECTS[1]).toEqual({
       name: "staging",
@@ -231,11 +228,11 @@ describe("config", () => {
     );
     readFileSyncMock.mockReturnValue(
       JSON.stringify({
+        apiBase: "ftp://example.com/api/1",
         projects: [
           {
             name: "backend",
             token: "tok_backend",
-            apiBase: "ftp://example.com/api/1",
           },
         ],
       }),

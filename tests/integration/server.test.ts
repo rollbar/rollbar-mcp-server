@@ -40,7 +40,9 @@ describe('MCP Server Integration', () => {
       start: vi.fn(),
       close: vi.fn()
     };
-    (StdioServerTransport as any).mockImplementation(() => mockTransport);
+    (StdioServerTransport as any).mockImplementation(function () {
+      return mockTransport;
+    });
   });
 
   afterEach(() => {

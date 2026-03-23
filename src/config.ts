@@ -27,18 +27,17 @@ const ProjectConfigSchema = z
   .object({
     name: z.string().min(1),
     token: z.string().min(1),
-    apiBase: HttpUrlSchema.optional(),
   })
   .passthrough();
 
 const RollbarMcpConfigSchema = z
   .object({
     projects: z.array(ProjectConfigSchema).min(1),
+    apiBase: HttpUrlSchema.optional(),
   })
   .passthrough()
-  .refine((value) => !("token" in value) && !("apiBase" in value), {
-    message:
-      'Top-level "token" and "apiBase" are not allowed when "projects" is present.',
+  .refine((value) => !("token" in value), {
+    message: 'Top-level "token" is not allowed when "projects" is present.',
   });
 
 // Single project shorthand (no name, no projects array)
@@ -103,10 +102,11 @@ function loadProjectsFromFile(filePath: string): ProjectConfig[] | null {
 
   const multi = RollbarMcpConfigSchema.safeParse(json);
   if (multi.success) {
+    const sharedApiBase = normalizeApiBase(multi.data.apiBase);
     return multi.data.projects.map((p) => ({
       name: p.name,
       token: p.token,
-      apiBase: normalizeApiBase(p.apiBase),
+      apiBase: sharedApiBase,
     }));
   }
 

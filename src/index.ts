@@ -6,44 +6,18 @@ import { registerAllTools } from "./tools/index.js";
 import { registerAllResources } from "./resources/index.js";
 
 // Create server instance
-const server = new McpServer({
-  name: "rollbar",
-  version: "0.0.1",
-  capabilities: {
-    resources: {},
-    tools: {
-      "get-item-details": {
-        description:
-          "Get detailed information about a Rollbar item by its counter",
-      },
-      "get-deployments": {
-        description:
-          "Get deployment status and information for a Rollbar project",
-      },
-      "get-version": {
-        description: "Get version data and information for a Rollbar project",
-      },
-      "get-top-items": {
-        description: "Get list of top items in the Rollbar project",
-      },
-      "list-items": {
-        description:
-          "List all items in the Rollbar project with optional search and filtering",
-      },
-      "get-replay": {
-        description: "Get replay data for a specific session replay in Rollbar",
-      },
-      "list-projects": {
-        description:
-          "List configured Rollbar projects available in this MCP server",
-      },
-      "update-item": {
-        description:
-          "Update the status, level, title, or assignment of a Rollbar item",
-      },
+const server = new McpServer(
+  {
+    name: "rollbar",
+    version: "0.0.1",
+  },
+  {
+    capabilities: {
+      resources: {},
+      tools: {},
     },
   },
-});
+);
 
 // Register all tools
 registerAllResources(server);
