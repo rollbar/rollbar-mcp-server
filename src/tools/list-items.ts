@@ -1,7 +1,8 @@
 import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { ROLLBAR_API_BASE } from "../config.js";
+import { resolveProject } from "../config.js";
 import { makeRollbarRequest } from "../utils/api.js";
+import { buildProjectParam } from "../utils/project-params.js";
 import {
   RollbarApiResponse,
   RollbarListItemsResponse,
@@ -51,6 +52,7 @@ export function registerListItemsTool(server: McpServer) {
         .string()
         .optional()
         .describe("Search query to filter items by title or content"),
+      project: buildProjectParam(),
     },
     async ({
       status,
@@ -59,6 +61,7 @@ export function registerListItemsTool(server: McpServer) {
       page,
       limit,
       query,
+      project,
     }: {
       status?: string;
       level?: string[];
@@ -66,7 +69,9 @@ export function registerListItemsTool(server: McpServer) {
       page?: number;
       limit?: number;
       query?: string;
+      project?: string;
     }) => {
+      const { token, apiBase } = resolveProject(project);
       // Build query parameters
       const params = new URLSearchParams();
 
@@ -94,11 +99,11 @@ export function registerListItemsTool(server: McpServer) {
         params.append("q", query);
       }
 
-      const listUrl = `${ROLLBAR_API_BASE}/items/?${params.toString()}`;
+      const listUrl = `${apiBase}/items/?${params.toString()}`;
 
       const listResponse = await makeRollbarRequest<
         RollbarApiResponse<RollbarListItemsResponse>
-      >(listUrl, "list-items");
+      >(listUrl, "list-items", token);
 
       if (listResponse.err !== 0) {
         const errorMessage =

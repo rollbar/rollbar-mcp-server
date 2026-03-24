@@ -18,8 +18,19 @@ vi.mock('node:fs/promises', () => ({
 }));
 
 vi.mock('../../../src/config.js', () => ({
-  ROLLBAR_API_BASE: 'https://api.rollbar.com/api/1',
-  ROLLBAR_ACCESS_TOKEN: 'test-token'
+  PROJECTS: [
+    {
+      name: 'default',
+      token: 'test-token',
+      apiBase: 'https://api.rollbar.com/api/1',
+    },
+  ],
+  resolveProject: vi.fn(() => ({
+    name: 'default',
+    token: 'test-token',
+    apiBase: 'https://api.rollbar.com/api/1',
+  })),
+  getUserAgent: (toolName: string) => `rollbar-mcp-server/test (tool: ${toolName})`,
 }));
 
 describe('get-replay tool', () => {
@@ -70,7 +81,8 @@ describe('get-replay tool', () => {
 
     expect(makeRollbarRequestMock).toHaveBeenCalledWith(
       'https://api.rollbar.com/api/1/environment/production/session/session-123/replay/replay-456',
-      'get-replay'
+      'get-replay',
+      'test-token'
     );
 
     const expectedResourceUri = buildReplayResourceUri(
@@ -144,7 +156,8 @@ describe('get-replay tool', () => {
 
     expect(makeRollbarRequestMock).toHaveBeenCalledWith(
       'https://api.rollbar.com/api/1/environment/prod%20env/session/session%2F123/replay/replay%3A456',
-      'get-replay'
+      'get-replay',
+      'test-token'
     );
   });
 
@@ -182,5 +195,105 @@ describe('get-replay tool', () => {
     expect(() => schema.sessionId.parse('')).toThrow();
     expect(() => schema.replayId.parse('replay-123')).not.toThrow();
     expect(() => schema.replayId.parse('')).toThrow();
+    expect(schema.project).toBeDefined();
+  });
+
+  it('should work with explicit project default', async () => {
+    makeRollbarRequestMock.mockResolvedValueOnce(mockSuccessfulReplayResponse);
+
+    await toolHandler({
+      environment: 'production',
+      sessionId: 'session-123',
+      replayId: 'replay-456',
+      project: 'default',
+    });
+
+    expect(makeRollbarRequestMock).toHaveBeenCalledWith(
+      'https://api.rollbar.com/api/1/environment/production/session/session-123/replay/replay-456',
+      'get-replay',
+      'test-token'
+    );
+  });
+
+  it('should reject delivery=resource when multiple projects are configured', async () => {
+    vi.resetModules();
+    vi.doMock('../../../src/config.js', () => ({
+      PROJECTS: [
+        { name: 'backend', token: 'token-1', apiBase: 'https://api.rollbar.com/api/1' },
+        { name: 'frontend', token: 'token-2', apiBase: 'https://api.rollbar.com/api/1' },
+      ],
+      resolveProject: vi.fn(() => ({
+        name: 'backend',
+        token: 'token-1',
+        apiBase: 'https://api.rollbar.com/api/1',
+      })),
+      getUserAgent: (toolName: string) => `rollbar-mcp-server/test (tool: ${toolName})`,
+    }));
+
+    const { makeRollbarRequest } = await import('../../../src/utils/api.js');
+    const localMakeRollbarRequestMock = makeRollbarRequest as any;
+    localMakeRollbarRequestMock.mockResolvedValueOnce(mockSuccessfulReplayResponse);
+
+    const { registerGetReplayTool: register } = await import('../../../src/tools/get-replay.js');
+    let localToolHandler: any;
+    const localServer = {
+      tool: vi.fn((_name, _description, _schema, handler) => {
+        localToolHandler = handler;
+      }),
+    } as any;
+
+    register(localServer);
+
+    await expect(
+      localToolHandler({
+        environment: 'production',
+        sessionId: 'session-123',
+        replayId: 'replay-456',
+        project: 'backend',
+        delivery: 'resource',
+      })
+    ).rejects.toThrow(
+      'delivery="resource" is not supported when multiple projects are configured'
+    );
+  });
+
+  it('should still allow delivery=file when multiple projects are configured', async () => {
+    vi.resetModules();
+    vi.doMock('../../../src/config.js', () => ({
+      PROJECTS: [
+        { name: 'backend', token: 'token-1', apiBase: 'https://api.rollbar.com/api/1' },
+        { name: 'frontend', token: 'token-2', apiBase: 'https://api.rollbar.com/api/1' },
+      ],
+      resolveProject: vi.fn(() => ({
+        name: 'backend',
+        token: 'token-1',
+        apiBase: 'https://api.rollbar.com/api/1',
+      })),
+      getUserAgent: (toolName: string) => `rollbar-mcp-server/test (tool: ${toolName})`,
+    }));
+
+    const { makeRollbarRequest } = await import('../../../src/utils/api.js');
+    const localMakeRollbarRequestMock = makeRollbarRequest as any;
+    localMakeRollbarRequestMock.mockResolvedValueOnce(mockSuccessfulReplayResponse);
+
+    const { registerGetReplayTool: register } = await import('../../../src/tools/get-replay.js');
+    let localToolHandler: any;
+    const localServer = {
+      tool: vi.fn((_name, _description, _schema, handler) => {
+        localToolHandler = handler;
+      }),
+    } as any;
+
+    register(localServer);
+
+    await localToolHandler({
+      environment: 'production',
+      sessionId: 'session-123',
+      replayId: 'replay-456',
+      project: 'backend',
+      delivery: 'file',
+    });
+
+    expect(writeFileMock).toHaveBeenCalledTimes(1);
   });
 });

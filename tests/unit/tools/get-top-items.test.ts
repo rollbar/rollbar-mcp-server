@@ -8,8 +8,19 @@ vi.mock('../../../src/utils/api.js', () => ({
 }));
 
 vi.mock('../../../src/config.js', () => ({
-  ROLLBAR_API_BASE: 'https://api.rollbar.com/api/1',
-  ROLLBAR_ACCESS_TOKEN: 'test-token'
+  PROJECTS: [
+    {
+      name: 'default',
+      token: 'test-token',
+      apiBase: 'https://api.rollbar.com/api/1',
+    },
+  ],
+  resolveProject: vi.fn(() => ({
+    name: 'default',
+    token: 'test-token',
+    apiBase: 'https://api.rollbar.com/api/1',
+  })),
+  getUserAgent: (toolName: string) => `rollbar-mcp-server/test (tool: ${toolName})`,
 }));
 
 describe('get-top-items tool', () => {
@@ -40,7 +51,8 @@ describe('get-top-items tool', () => {
       'get-top-items',
       'Get list of top items in the Rollbar project',
       expect.objectContaining({
-        environment: expect.any(Object)
+        environment: expect.any(Object),
+        project: expect.any(Object),
       }),
       expect.any(Function)
     );
@@ -53,7 +65,8 @@ describe('get-top-items tool', () => {
 
     expect(makeRollbarRequestMock).toHaveBeenCalledWith(
       'https://api.rollbar.com/api/1/reports/top_active_items?hours=24&environments=staging&sort=occurrences',
-      'get-top-items'
+      'get-top-items',
+      'test-token'
     );
     expect(result.content[0].type).toBe('text');
     const parsed = JSON.parse(result.content[0].text);
@@ -68,7 +81,8 @@ describe('get-top-items tool', () => {
 
     expect(makeRollbarRequestMock).toHaveBeenCalledWith(
       'https://api.rollbar.com/api/1/reports/top_active_items?hours=24&environments=production&sort=occurrences',
-      'get-top-items'
+      'get-top-items',
+      'test-token'
     );
   });
 
@@ -133,7 +147,20 @@ describe('get-top-items tool', () => {
 
     expect(makeRollbarRequestMock).toHaveBeenCalledWith(
       'https://api.rollbar.com/api/1/reports/top_active_items?hours=24&environments=development&sort=occurrences',
-      'get-top-items'
+      'get-top-items',
+      'test-token'
+    );
+  });
+
+  it('should work with explicit project default', async () => {
+    makeRollbarRequestMock.mockResolvedValueOnce(mockSuccessfulTopItemsResponse);
+
+    await toolHandler({ environment: 'production', project: 'default' });
+
+    expect(makeRollbarRequestMock).toHaveBeenCalledWith(
+      'https://api.rollbar.com/api/1/reports/top_active_items?hours=24&environments=production&sort=occurrences',
+      'get-top-items',
+      'test-token'
     );
   });
 });
