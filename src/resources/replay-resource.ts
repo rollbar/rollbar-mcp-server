@@ -3,7 +3,7 @@ import type {
   McpServer,
   ReadResourceTemplateCallback,
 } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { ROLLBAR_API_BASE } from "../config.js";
+import { PROJECTS, resolveProject } from "../config.js";
 import { makeRollbarRequest } from "../utils/api.js";
 import { RollbarApiResponse } from "../types/index.js";
 
@@ -33,11 +33,12 @@ function normalizeTemplateVariable(
 }
 
 function buildReplayApiUrl(
+  apiBase: string,
   environment: string,
   sessionId: string,
   replayId: string,
 ): string {
-  return `${ROLLBAR_API_BASE}/environment/${encodeURIComponent(
+  return `${apiBase}/environment/${encodeURIComponent(
     environment,
   )}/session/${encodeURIComponent(sessionId)}/replay/${encodeURIComponent(
     replayId,
@@ -76,12 +77,20 @@ export async function fetchReplayData(
   environment: string,
   sessionId: string,
   replayId: string,
+  token: string,
+  apiBase: string,
 ): Promise<unknown> {
-  const replayUrl = buildReplayApiUrl(environment, sessionId, replayId);
+  const replayUrl = buildReplayApiUrl(
+    apiBase,
+    environment,
+    sessionId,
+    replayId,
+  );
 
   const replayResponse = await makeRollbarRequest<RollbarApiResponse<unknown>>(
     replayUrl,
     "get-replay",
+    token,
   );
 
   if (replayResponse.err !== 0) {
@@ -97,6 +106,14 @@ const readReplayResource: ReadResourceTemplateCallback = async (
   uri,
   variables,
 ) => {
+  if (PROJECTS.length > 1) {
+    throw new Error(
+      "Direct replay resource access is not supported when multiple projects are configured. " +
+        "Use the get-replay tool with a project parameter instead.",
+    );
+  }
+  const { token, apiBase } = resolveProject(undefined);
+
   const environmentValue = normalizeTemplateVariable(variables.environment);
   const sessionValue = normalizeTemplateVariable(variables.sessionId);
   const replayValue = normalizeTemplateVariable(variables.replayId);
@@ -117,7 +134,7 @@ const readReplayResource: ReadResourceTemplateCallback = async (
   const replayData =
     cached !== undefined
       ? cached
-      : await fetchReplayData(environment, sessionId, replayId);
+      : await fetchReplayData(environment, sessionId, replayId, token, apiBase);
 
   if (cached === undefined) {
     cacheReplayData(resourceUri, replayData);
