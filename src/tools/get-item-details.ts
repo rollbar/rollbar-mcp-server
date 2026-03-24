@@ -1,7 +1,8 @@
 import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { ROLLBAR_API_BASE } from "../config.js";
+import { resolveProject } from "../config.js";
 import { makeRollbarRequest } from "../utils/api.js";
+import { buildProjectParam } from "../utils/project-params.js";
 import {
   RollbarApiResponse,
   RollbarItemResponse,
@@ -23,13 +24,15 @@ export function registerGetItemDetailsTool(server: McpServer) {
         .describe(
           "Maximum tokens for occurrence data in response (default: 20000). Occurrence response will be truncated if it exceeds this limit.",
         ),
+      project: buildProjectParam(),
     },
-    async ({ counter, max_tokens }) => {
+    async ({ counter, max_tokens, project }) => {
+      const { token, apiBase } = resolveProject(project);
       // Redirects are followed, so we get an item response from the counter request
-      const counterUrl = `${ROLLBAR_API_BASE}/item_by_counter/${counter}`;
+      const counterUrl = `${apiBase}/item_by_counter/${counter}`;
       const itemResponse = await makeRollbarRequest<
         RollbarApiResponse<RollbarItemResponse>
-      >(counterUrl, "get-item-details");
+      >(counterUrl, "get-item-details", token);
 
       if (itemResponse.err !== 0) {
         const errorMessage =
@@ -39,10 +42,10 @@ export function registerGetItemDetailsTool(server: McpServer) {
 
       const item = itemResponse.result;
 
-      const occurrenceUrl = `${ROLLBAR_API_BASE}/instance/${item.last_occurrence_id}`;
+      const occurrenceUrl = `${apiBase}/instance/${item.last_occurrence_id}`;
       const occurrenceResponse = await makeRollbarRequest<
         RollbarApiResponse<RollbarOccurrenceResponse>
-      >(occurrenceUrl, "get-item-details");
+      >(occurrenceUrl, "get-item-details", token);
 
       if (occurrenceResponse.err !== 0) {
         // We got the item but failed to get occurrence. Return just the item data.

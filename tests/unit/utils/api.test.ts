@@ -13,7 +13,6 @@ describe('api utilities', () => {
     
     // Mock config module with test values
     vi.doMock('../../../src/config.js', () => ({
-      ROLLBAR_ACCESS_TOKEN: 'test-token',
       getUserAgent: (toolName: string) => `test-user-agent (tool: ${toolName})`
     }));
     
@@ -36,7 +35,7 @@ describe('api utilities', () => {
         json: vi.fn().mockResolvedValueOnce(mockResponse)
       });
 
-      const result = await makeRollbarRequest(testUrl, 'test-tool');
+      const result = await makeRollbarRequest(testUrl, 'test-tool', 'test-token');
 
       expect(fetchMock).toHaveBeenCalledWith(testUrl, {
         headers: {
@@ -48,18 +47,6 @@ describe('api utilities', () => {
       expect(result).toEqual(mockResponse);
     });
 
-    it('should handle missing ROLLBAR_ACCESS_TOKEN', async () => {
-      vi.resetModules();
-      vi.doMock('../../../src/config.js', () => ({
-        ROLLBAR_ACCESS_TOKEN: undefined,
-        getUserAgent: (toolName: string) => `test-user-agent (tool: ${toolName})`
-      }));
-
-      const { makeRollbarRequest: makeRequest } = await import('../../../src/utils/api.js');
-      
-      await expect(makeRequest(testUrl, 'test-tool')).rejects.toThrow('ROLLBAR_ACCESS_TOKEN environment variable is not set');
-    });
-
     it('should handle HTTP 401 error response', async () => {
       fetchMock.mockResolvedValueOnce({
         ok: false,
@@ -68,7 +55,7 @@ describe('api utilities', () => {
         text: vi.fn().mockResolvedValueOnce('')
       });
 
-      await expect(makeRollbarRequest(testUrl, 'test-tool')).rejects.toThrow('Rollbar API error: 401 Unauthorized');
+      await expect(makeRollbarRequest(testUrl, 'test-tool', 'test-token')).rejects.toThrow('Rollbar API error: 401 Unauthorized');
     });
 
     it('should handle HTTP 403 error response', async () => {
@@ -79,7 +66,7 @@ describe('api utilities', () => {
         text: vi.fn().mockResolvedValueOnce('')
       });
 
-      await expect(makeRollbarRequest(testUrl, 'test-tool')).rejects.toThrow('Rollbar API error: 403 Forbidden');
+      await expect(makeRollbarRequest(testUrl, 'test-tool', 'test-token')).rejects.toThrow('Rollbar API error: 403 Forbidden');
     });
 
     it('should handle HTTP 404 error response', async () => {
@@ -90,7 +77,7 @@ describe('api utilities', () => {
         text: vi.fn().mockResolvedValueOnce('')
       });
 
-      await expect(makeRollbarRequest(testUrl, 'test-tool')).rejects.toThrow('Rollbar API error: 404 Not Found');
+      await expect(makeRollbarRequest(testUrl, 'test-tool', 'test-token')).rejects.toThrow('Rollbar API error: 404 Not Found');
     });
 
     it('should handle HTTP 500 error response', async () => {
@@ -101,13 +88,13 @@ describe('api utilities', () => {
         text: vi.fn().mockResolvedValueOnce('')
       });
 
-      await expect(makeRollbarRequest(testUrl, 'test-tool')).rejects.toThrow('Rollbar API error: 500 Internal Server Error');
+      await expect(makeRollbarRequest(testUrl, 'test-tool', 'test-token')).rejects.toThrow('Rollbar API error: 500 Internal Server Error');
     });
 
     it('should handle network failure', async () => {
       fetchMock.mockRejectedValueOnce(new Error('Network error'));
 
-      await expect(makeRollbarRequest(testUrl, 'test-tool')).rejects.toThrow('Network error');
+      await expect(makeRollbarRequest(testUrl, 'test-tool', 'test-token')).rejects.toThrow('Network error');
     });
 
     it('should handle JSON parsing errors', async () => {
@@ -116,7 +103,7 @@ describe('api utilities', () => {
         json: vi.fn().mockRejectedValueOnce(new Error('Invalid JSON'))
       });
 
-      await expect(makeRollbarRequest(testUrl, 'test-tool')).rejects.toThrow('Invalid JSON');
+      await expect(makeRollbarRequest(testUrl, 'test-tool', 'test-token')).rejects.toThrow('Invalid JSON');
     });
 
     it('should properly type the response', async () => {
@@ -131,7 +118,7 @@ describe('api utilities', () => {
         json: vi.fn().mockResolvedValueOnce(mockResponse)
       });
 
-      const result = await makeRollbarRequest<TestResponse>(testUrl, 'test-tool');
+      const result = await makeRollbarRequest<TestResponse>(testUrl, 'test-tool', 'test-token');
 
       expect(result).toEqual(mockResponse);
       expect(result?.id).toBe(1);
@@ -146,7 +133,7 @@ describe('api utilities', () => {
         text: vi.fn().mockResolvedValueOnce('{"message": "Custom error message"}')
       });
 
-      await expect(makeRollbarRequest(testUrl, 'test-tool')).rejects.toThrow('Rollbar API error: Custom error message');
+      await expect(makeRollbarRequest(testUrl, 'test-tool', 'test-token')).rejects.toThrow('Rollbar API error: Custom error message');
     });
 
     it('should include short text in error when not JSON', async () => {
@@ -157,7 +144,7 @@ describe('api utilities', () => {
         text: vi.fn().mockResolvedValueOnce('Short error text')
       });
 
-      await expect(makeRollbarRequest(testUrl, 'test-tool')).rejects.toThrow('Rollbar API error: 400 Bad Request - Short error text');
+      await expect(makeRollbarRequest(testUrl, 'test-tool', 'test-token')).rejects.toThrow('Rollbar API error: 400 Bad Request - Short error text');
     });
     it('should include tool name in user agent string', async () => {
       const mockResponse = { data: 'test' };
@@ -166,7 +153,7 @@ describe('api utilities', () => {
         json: vi.fn().mockResolvedValueOnce(mockResponse)
       });
 
-      await makeRollbarRequest(testUrl, 'get-item-details');
+      await makeRollbarRequest(testUrl, 'get-item-details', 'test-token');
 
       expect(fetchMock).toHaveBeenCalledWith(testUrl, {
         headers: {
@@ -184,7 +171,7 @@ describe('api utilities', () => {
         json: vi.fn().mockResolvedValue(mockResponse)
       });
 
-      await makeRollbarRequest(testUrl, 'list-items');
+      await makeRollbarRequest(testUrl, 'list-items', 'test-token');
       expect(fetchMock).toHaveBeenLastCalledWith(testUrl, {
         headers: {
           'User-Agent': 'test-user-agent (tool: list-items)',
@@ -193,7 +180,7 @@ describe('api utilities', () => {
         }
       });
 
-      await makeRollbarRequest(testUrl, 'update-item');
+      await makeRollbarRequest(testUrl, 'update-item', 'test-token');
       expect(fetchMock).toHaveBeenLastCalledWith(testUrl, {
         headers: {
           'User-Agent': 'test-user-agent (tool: update-item)',
