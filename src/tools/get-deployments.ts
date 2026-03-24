@@ -1,7 +1,8 @@
 import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { ROLLBAR_API_BASE } from "../config.js";
+import { resolveProject } from "../config.js";
 import { makeRollbarRequest } from "../utils/api.js";
+import { buildProjectParam } from "../utils/project-params.js";
 import { RollbarApiResponse, RollbarDeployResponse } from "../types/index.js";
 
 export function registerGetDeploymentsTool(server: McpServer) {
@@ -13,12 +14,14 @@ export function registerGetDeploymentsTool(server: McpServer) {
         .number()
         .int()
         .describe("Number of Rollbar deployments to retrieve"),
+      project: buildProjectParam(),
     },
-    async ({ limit }) => {
-      const deploysUrl = `${ROLLBAR_API_BASE}/deploys?limit=${limit}`;
+    async ({ limit, project }) => {
+      const { token, apiBase } = resolveProject(project);
+      const deploysUrl = `${apiBase}/deploys?limit=${limit}`;
       const deploysResponse = await makeRollbarRequest<
         RollbarApiResponse<RollbarDeployResponse>
-      >(deploysUrl, "get-deployments");
+      >(deploysUrl, "get-deployments", token);
 
       if (deploysResponse.err !== 0) {
         const errorMessage =

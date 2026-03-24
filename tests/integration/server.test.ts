@@ -3,11 +3,21 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { registerAllTools } from '../../src/tools/index.js';
 
-// Mock the config to provide ROLLBAR_ACCESS_TOKEN
+// Mock the config to provide PROJECTS and resolveProject
 vi.mock('../../src/config.js', () => ({
-  ROLLBAR_API_BASE: 'https://api.rollbar.com/api/1',
-  USER_AGENT: 'rollbar-mcp-server/0.0.1',
-  ROLLBAR_ACCESS_TOKEN: 'test-token'
+  PROJECTS: [
+    {
+      name: 'default',
+      token: 'test-token',
+      apiBase: 'https://api.rollbar.com/api/1',
+    },
+  ],
+  resolveProject: vi.fn(() => ({
+    name: 'default',
+    token: 'test-token',
+    apiBase: 'https://api.rollbar.com/api/1',
+  })),
+  getUserAgent: (toolName: string) => `rollbar-mcp-server/test (tool: ${toolName})`,
 }));
 
 // Mock the transport
@@ -30,7 +40,9 @@ describe('MCP Server Integration', () => {
       start: vi.fn(),
       close: vi.fn()
     };
-    (StdioServerTransport as any).mockImplementation(() => mockTransport);
+    (StdioServerTransport as any).mockImplementation(function () {
+      return mockTransport;
+    });
   });
 
   afterEach(() => {
@@ -83,7 +95,7 @@ describe('MCP Server Integration', () => {
     const toolSpy = vi.spyOn(server, 'tool');
     registerAllTools(server);
 
-    expect(toolSpy).toHaveBeenCalledTimes(7);
+    expect(toolSpy).toHaveBeenCalledTimes(8);
     expect(toolSpy).toHaveBeenCalledWith(
       'get-item-details',
       expect.any(String),
@@ -122,6 +134,12 @@ describe('MCP Server Integration', () => {
     );
     expect(toolSpy).toHaveBeenCalledWith(
       'get-replay',
+      expect.any(String),
+      expect.any(Object),
+      expect.any(Function)
+    );
+    expect(toolSpy).toHaveBeenCalledWith(
+      'list-projects',
       expect.any(String),
       expect.any(Object),
       expect.any(Function)
@@ -337,6 +355,15 @@ describe('MCP Server Integration', () => {
         },
         'list-items': {
           description: 'List all items in the Rollbar project with optional search and filtering'
+        },
+        'update-item': {
+          description: 'Update the status, level, title, or assignment of a Rollbar item'
+        },
+        'get-replay': {
+          description: 'Get replay data for a specific session replay in Rollbar'
+        },
+        'list-projects': {
+          description: 'List configured Rollbar projects available in this MCP server'
         }
       }
     };
@@ -350,7 +377,7 @@ describe('MCP Server Integration', () => {
     server = new McpServer(config);
 
     expect(capabilities).toEqual(capabilities);
-    expect(Object.keys(capabilities.tools)).toHaveLength(5);
+    expect(Object.keys(capabilities.tools)).toHaveLength(8);
 
     // Verify all tools have descriptions
     Object.values(capabilities.tools).forEach(tool => {

@@ -8,8 +8,19 @@ vi.mock('../../../src/utils/api.js', () => ({
 }));
 
 vi.mock('../../../src/config.js', () => ({
-  ROLLBAR_API_BASE: 'https://api.rollbar.com/api/1',
-  ROLLBAR_ACCESS_TOKEN: 'test-token'
+  PROJECTS: [
+    {
+      name: 'default',
+      token: 'test-token',
+      apiBase: 'https://api.rollbar.com/api/1',
+    },
+  ],
+  resolveProject: vi.fn(() => ({
+    name: 'default',
+    token: 'test-token',
+    apiBase: 'https://api.rollbar.com/api/1',
+  })),
+  getUserAgent: (toolName: string) => `rollbar-mcp-server/test (tool: ${toolName})`,
 }));
 
 describe('get-deployments tool', () => {
@@ -40,7 +51,8 @@ describe('get-deployments tool', () => {
       'get-deployments',
       'Get deployments data from Rollbar',
       expect.objectContaining({
-        limit: expect.any(Object)
+        limit: expect.any(Object),
+        project: expect.any(Object),
       }),
       expect.any(Function)
     );
@@ -53,7 +65,8 @@ describe('get-deployments tool', () => {
 
     expect(makeRollbarRequestMock).toHaveBeenCalledWith(
       'https://api.rollbar.com/api/1/deploys?limit=10',
-      'get-deployments'
+      'get-deployments',
+      'test-token'
     );
     expect(result.content[0].type).toBe('text');
     const parsed = JSON.parse(result.content[0].text);
@@ -80,7 +93,8 @@ describe('get-deployments tool', () => {
 
     expect(makeRollbarRequestMock).toHaveBeenCalledWith(
       'https://api.rollbar.com/api/1/deploys?limit=20',
-      'get-deployments'
+      'get-deployments',
+      'test-token'
     );
   });
 
@@ -107,6 +121,20 @@ describe('get-deployments tool', () => {
     expect(() => schema.limit.parse(3.14)).toThrow();
     expect(() => schema.limit.parse('10')).toThrow();
     expect(() => schema.limit.parse(null)).toThrow();
+  });
+
+  it('should work with explicit project default', async () => {
+    makeRollbarRequestMock.mockResolvedValueOnce(mockSuccessfulDeployResponse);
+
+    const result = await toolHandler({ limit: 10, project: 'default' });
+
+    expect(makeRollbarRequestMock).toHaveBeenCalledWith(
+      'https://api.rollbar.com/api/1/deploys?limit=10',
+      'get-deployments',
+      'test-token'
+    );
+    const parsed = JSON.parse(result.content[0].text);
+    expect(parsed.environment).toBe('production');
   });
 
   it('should format response as compact JSON', async () => {

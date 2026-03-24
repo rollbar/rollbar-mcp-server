@@ -1,7 +1,8 @@
 import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { ROLLBAR_API_BASE } from "../config.js";
+import { resolveProject } from "../config.js";
 import { makeRollbarRequest } from "../utils/api.js";
+import { buildProjectParam } from "../utils/project-params.js";
 import { RollbarApiResponse, RollbarVersionsResponse } from "../types/index.js";
 
 export function registerGetVersionTool(server: McpServer) {
@@ -14,12 +15,14 @@ export function registerGetVersionTool(server: McpServer) {
         .string()
         .default("production")
         .describe("Environment name (default: production)"),
+      project: buildProjectParam(),
     },
-    async ({ version, environment }) => {
-      const versionsUrl = `${ROLLBAR_API_BASE}/versions/${version}?environment=${environment}`;
+    async ({ version, environment, project }) => {
+      const { token, apiBase } = resolveProject(project);
+      const versionsUrl = `${apiBase}/versions/${version}?environment=${environment}`;
       const versionsResponse = await makeRollbarRequest<
         RollbarApiResponse<RollbarVersionsResponse>
-      >(versionsUrl, "get-version");
+      >(versionsUrl, "get-version", token);
 
       if (versionsResponse.err !== 0) {
         const errorMessage =
