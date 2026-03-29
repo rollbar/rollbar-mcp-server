@@ -127,6 +127,12 @@ describe('MCP Server Integration', () => {
       expect.any(Function)
     );
     expect(toolSpy).toHaveBeenCalledWith(
+      'list-occurrences',
+      expect.any(String),
+      expect.any(Object),
+      expect.any(Function)
+    );
+    expect(toolSpy).toHaveBeenCalledWith(
       'update-item',
       expect.any(String),
       expect.any(Object),

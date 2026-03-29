@@ -157,3 +157,9 @@ export interface RollbarListItemsResponse {
   items: RollbarListItemResponse[];
   [key: string]: any; // Allow for any other properties
 }
+
+export interface RollbarListOccurrencesResponse {
+  page: number;
+  instances: RollbarOccurrenceResponse[];
+  [key: string]: any; // Allow for any other properties
+}
