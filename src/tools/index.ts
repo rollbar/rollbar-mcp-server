@@ -7,6 +7,7 @@ import { registerListItemsTool } from "./list-items.js";
 import { registerListOccurrencesTool } from "./list-occurrences.js";
 import { registerUpdateItemTool } from "./update-item.js";
 import { registerGetReplayTool } from "./get-replay.js";
+import { registerListProjectsTool } from "./list-projects.js";
 
 export function registerAllTools(server: McpServer) {
   registerGetItemDetailsTool(server);
@@ -17,4 +18,5 @@ export function registerAllTools(server: McpServer) {
   registerListOccurrencesTool(server);
   registerUpdateItemTool(server);
   registerGetReplayTool(server);
+  registerListProjectsTool(server);
 }

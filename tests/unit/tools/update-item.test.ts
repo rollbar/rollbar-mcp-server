@@ -8,8 +8,19 @@ vi.mock('../../../src/utils/api.js', () => ({
 }));
 
 vi.mock('../../../src/config.js', () => ({
-  ROLLBAR_API_BASE: 'https://api.rollbar.com/api/1',
-  ROLLBAR_ACCESS_TOKEN: 'test-token'
+  PROJECTS: [
+    {
+      name: 'default',
+      token: 'test-token',
+      apiBase: 'https://api.rollbar.com/api/1',
+    },
+  ],
+  resolveProject: vi.fn(() => ({
+    name: 'default',
+    token: 'test-token',
+    apiBase: 'https://api.rollbar.com/api/1',
+  })),
+  getUserAgent: (toolName: string) => `rollbar-mcp-server/test (tool: ${toolName})`,
 }));
 
 describe('update-item tool', () => {
@@ -47,7 +58,8 @@ describe('update-item tool', () => {
         assignedUserId: expect.any(Object),
         resolvedInVersion: expect.any(Object),
         snoozed: expect.any(Object),
-        teamId: expect.any(Object)
+        teamId: expect.any(Object),
+        project: expect.any(Object),
       }),
       expect.any(Function)
     );
@@ -68,6 +80,7 @@ describe('update-item tool', () => {
     expect(makeRollbarRequestMock).toHaveBeenCalledWith(
       'https://api.rollbar.com/api/1/item/123',
       'update-item',
+      'test-token',
       {
         method: 'PATCH',
         headers: {
@@ -102,6 +115,7 @@ describe('update-item tool', () => {
     expect(makeRollbarRequestMock).toHaveBeenCalledWith(
       'https://api.rollbar.com/api/1/item/456',
       'update-item',
+      'test-token',
       {
         method: 'PATCH',
         headers: {
@@ -179,6 +193,7 @@ describe('update-item tool', () => {
     expect(makeRollbarRequestMock).toHaveBeenCalledWith(
       'https://api.rollbar.com/api/1/item/123',
       'update-item',
+      'test-token',
       {
         method: 'PATCH',
         headers: {
@@ -186,6 +201,27 @@ describe('update-item tool', () => {
         },
         body: JSON.stringify({ title: 'New title' })
       }
+    );
+  });
+
+  it('should work with explicit project default', async () => {
+    const mockResponse = {
+      err: 0,
+      result: { id: 123, status: 'resolved' }
+    };
+    makeRollbarRequestMock.mockResolvedValueOnce(mockResponse);
+
+    await toolHandler({
+      itemId: 123,
+      status: 'resolved',
+      project: 'default',
+    });
+
+    expect(makeRollbarRequestMock).toHaveBeenCalledWith(
+      'https://api.rollbar.com/api/1/item/123',
+      'update-item',
+      'test-token',
+      expect.any(Object)
     );
   });
 
@@ -258,6 +294,7 @@ describe('update-item tool', () => {
     expect(makeRollbarRequestMock).toHaveBeenCalledWith(
       'https://api.rollbar.com/api/1/item/123',
       'update-item',
+      'test-token',
       {
         method: 'PATCH',
         headers: {

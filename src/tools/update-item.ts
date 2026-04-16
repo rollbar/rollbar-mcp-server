@@ -1,7 +1,8 @@
 import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { ROLLBAR_API_BASE } from "../config.js";
+import { resolveProject } from "../config.js";
 import { makeRollbarRequest } from "../utils/api.js";
+import { buildProjectParam } from "../utils/project-params.js";
 import { RollbarApiResponse } from "../types/index.js";
 
 export function registerUpdateItemTool(server: McpServer) {
@@ -39,6 +40,7 @@ export function registerUpdateItemTool(server: McpServer) {
         .describe(
           "The ID of the team to assign as owner (Advanced/Enterprise accounts only)",
         ),
+      project: buildProjectParam(),
     },
     async ({
       itemId,
@@ -49,7 +51,9 @@ export function registerUpdateItemTool(server: McpServer) {
       resolvedInVersion,
       snoozed,
       teamId,
+      project,
     }) => {
+      const { token, apiBase } = resolveProject(project);
       const updateData: Record<string, unknown> = {};
 
       if (status !== undefined) updateData.status = status;
@@ -66,10 +70,11 @@ export function registerUpdateItemTool(server: McpServer) {
         throw new Error("At least one field must be provided to update");
       }
 
-      const url = `${ROLLBAR_API_BASE}/item/${itemId}`;
+      const url = `${apiBase}/item/${itemId}`;
       const response = await makeRollbarRequest<RollbarApiResponse<unknown>>(
         url,
         "update-item",
+        token,
         {
           method: "PATCH",
           headers: {
