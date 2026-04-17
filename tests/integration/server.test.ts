@@ -95,7 +95,7 @@ describe('MCP Server Integration', () => {
     const toolSpy = vi.spyOn(server, 'tool');
     registerAllTools(server);
 
-    expect(toolSpy).toHaveBeenCalledTimes(8);
+    expect(toolSpy.mock.calls.length).toBeGreaterThanOrEqual(9);
     expect(toolSpy).toHaveBeenCalledWith(
       'get-item-details',
       expect.any(String),

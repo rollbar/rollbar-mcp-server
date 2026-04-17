@@ -56,7 +56,7 @@ describe("config", () => {
   it("should have getUserAgent function that generates correct user agent string", async () => {
     const { getUserAgent } = await import("../../src/config.js");
     const packageJsonModule = await import("../../package.json", {
-      with: { type: "json" },
+      assert: { type: "json" },
     });
     const expectedVersion = packageJsonModule.default.version;
     expect(getUserAgent("test-tool")).toBe(
@@ -71,28 +71,28 @@ describe("config", () => {
     expect(resolveProject(undefined).token).toBe("custom-token");
   });
 
-  it("should exit when neither config file nor env var is set", async () => {
+  it("should throw when neither config file nor env var is set", async () => {
     delete process.env.ROLLBAR_ACCESS_TOKEN;
     existsSyncMock.mockReturnValue(false);
 
-    await import("../../src/config.js");
-
+    await expect(import("../../src/config.js")).rejects.toThrow(
+      /No Rollbar configuration found/,
+    );
     expect(console.error).toHaveBeenCalledWith(
       expect.stringContaining("No Rollbar configuration found"),
     );
-    expect(process.exit).toHaveBeenCalledWith(1);
   });
 
-  it("should exit when ROLLBAR_API_BASE is invalid and using env token", async () => {
+  it("should throw when ROLLBAR_API_BASE is invalid and using env token", async () => {
     process.env.ROLLBAR_API_BASE = "not-a-valid-url";
     vi.resetModules();
 
-    await import("../../src/config.js");
-
+    await expect(import("../../src/config.js")).rejects.toThrow(
+      "Error: ROLLBAR_API_BASE must be a valid HTTP(S) URL when using ROLLBAR_ACCESS_TOKEN.",
+    );
     expect(console.error).toHaveBeenCalledWith(
       "Error: ROLLBAR_API_BASE must be a valid HTTP(S) URL when using ROLLBAR_ACCESS_TOKEN.",
     );
-    expect(process.exit).toHaveBeenCalledWith(1);
   });
 
   it("should call dotenv.config() on module load", async () => {
@@ -221,7 +221,7 @@ describe("config", () => {
     });
   });
 
-  it("should exit when config apiBase is not HTTP(S)", async () => {
+  it("should throw when config apiBase is not HTTP(S)", async () => {
     delete process.env.ROLLBAR_ACCESS_TOKEN;
     existsSyncMock.mockImplementation((p: string) =>
       p.endsWith(".rollbar-mcp.json"),
@@ -239,28 +239,28 @@ describe("config", () => {
     );
     vi.resetModules();
 
-    await import("../../src/config.js");
-
+    await expect(import("../../src/config.js")).rejects.toThrow(
+      /Invalid Rollbar config file/,
+    );
     expect(console.error).toHaveBeenCalledWith(
       expect.stringContaining("Invalid Rollbar config file"),
     );
-    expect(process.exit).toHaveBeenCalledWith(1);
   });
 
-  it("should exit when cwd config exists but is invalid instead of falling back to env", async () => {
+  it("should throw when cwd config exists but is invalid instead of falling back to env", async () => {
     existsSyncMock.mockImplementation((p: string) => p.endsWith(".rollbar-mcp.json"));
     readFileSyncMock.mockReturnValue(JSON.stringify({ projects: "not-an-array" }));
     vi.resetModules();
 
-    await import("../../src/config.js");
-
+    await expect(import("../../src/config.js")).rejects.toThrow(
+      /Invalid Rollbar config file/,
+    );
     expect(console.error).toHaveBeenCalledWith(
       expect.stringContaining("Invalid Rollbar config file"),
     );
-    expect(process.exit).toHaveBeenCalledWith(1);
   });
 
-  it("should exit when home config exists but is invalid instead of falling back to env", async () => {
+  it("should throw when home config exists but is invalid instead of falling back to env", async () => {
     existsSyncMock.mockImplementation(
       (p: string) =>
         p.endsWith(".rollbar-mcp.json") && !p.startsWith(process.cwd()),
@@ -268,15 +268,15 @@ describe("config", () => {
     readFileSyncMock.mockReturnValue("{ invalid json");
     vi.resetModules();
 
-    await import("../../src/config.js");
-
+    await expect(import("../../src/config.js")).rejects.toThrow(
+      /Invalid Rollbar config file/,
+    );
     expect(console.error).toHaveBeenCalledWith(
       expect.stringContaining("Invalid Rollbar config file"),
     );
-    expect(process.exit).toHaveBeenCalledWith(1);
   });
 
-  it("should exit when shorthand and multi-project fields are both present", async () => {
+  it("should throw when shorthand and multi-project fields are both present", async () => {
     delete process.env.ROLLBAR_ACCESS_TOKEN;
     existsSyncMock.mockImplementation((p: string) => p.endsWith(".rollbar-mcp.json"));
     readFileSyncMock.mockReturnValue(
@@ -287,12 +287,12 @@ describe("config", () => {
     );
     vi.resetModules();
 
-    await import("../../src/config.js");
-
+    await expect(import("../../src/config.js")).rejects.toThrow(
+      /expected either a single-project config/,
+    );
     expect(console.error).toHaveBeenCalledWith(
       expect.stringContaining("expected either a single-project config"),
     );
-    expect(process.exit).toHaveBeenCalledWith(1);
   });
 
   it("falls back to ROLLBAR_ACCESS_TOKEN when no config file is present", async () => {

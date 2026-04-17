@@ -121,10 +121,10 @@ describe('get-replay tool', () => {
     expect(mkdirMock).toHaveBeenCalledWith(expectedDir, { recursive: true });
     expect(writeFileMock).toHaveBeenCalledTimes(1);
 
-    const [filePath, fileContents, encoding] = writeFileMock.mock.calls[0];
+    const [filePath, fileContents, options] = writeFileMock.mock.calls[0];
     expect(filePath.startsWith(expectedDir + path.sep)).toBe(true);
     expect(fileContents).toBe(JSON.stringify(mockSuccessfulReplayResponse.result, null, 2));
-    expect(encoding).toBe('utf8');
+    expect(options).toEqual({ encoding: 'utf8', mode: 0o600 });
     expect(result.content[0].text).toContain(filePath);
     expect(result.content[0].text).toContain('not automatically deleted');
 

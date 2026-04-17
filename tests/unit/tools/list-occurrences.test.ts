@@ -12,8 +12,16 @@ vi.mock("../../../src/utils/api.js", () => ({
 }));
 
 vi.mock("../../../src/config.js", () => ({
-  ROLLBAR_API_BASE: "https://api.rollbar.com/api/1",
-  ROLLBAR_ACCESS_TOKEN: "test-token",
+  resolveProject: vi.fn(() => ({
+    token: "test-token",
+    apiBase: "https://api.rollbar.com/api/1",
+  })),
+}));
+
+vi.mock("../../../src/utils/project-params.js", () => ({
+  buildProjectParam: vi.fn(() => ({
+    optional: () => ({ describe: () => ({}) }),
+  })),
 }));
 
 describe("list-occurrences tool", () => {
@@ -47,7 +55,9 @@ describe("list-occurrences tool", () => {
         counter: expect.any(Object),
         page: expect.any(Object),
         limit: expect.any(Object),
-        lastId: expect.any(Object),
+        last_id: expect.any(Object),
+        lastId: expect.any(Object), // deprecated alias retained for compatibility
+        project: expect.any(Object),
       }),
       expect.any(Function)
     );
@@ -62,11 +72,13 @@ describe("list-occurrences tool", () => {
 
     expect(makeRollbarRequestMock).toHaveBeenCalledWith(
       "https://api.rollbar.com/api/1/item_by_counter/42",
-      "list-occurrences"
+      "list-occurrences",
+      "test-token"
     );
     expect(makeRollbarRequestMock).toHaveBeenCalledWith(
       "https://api.rollbar.com/api/1/item/1/instances?limit=3&page=1",
-      "list-occurrences"
+      "list-occurrences",
+      "test-token"
     );
 
     const responseData = JSON.parse(result.content[0].text);
@@ -89,7 +101,8 @@ describe("list-occurrences tool", () => {
 
     expect(makeRollbarRequestMock).toHaveBeenCalledWith(
       "https://api.rollbar.com/api/1/item/1/instances?limit=1&page=1",
-      "list-occurrences"
+      "list-occurrences",
+      "test-token"
     );
 
     const responseData = JSON.parse(result.content[0].text);
@@ -108,7 +121,8 @@ describe("list-occurrences tool", () => {
 
     expect(makeRollbarRequestMock).toHaveBeenCalledWith(
       "https://api.rollbar.com/api/1/item/1/instances?limit=3&page=2",
-      "list-occurrences"
+      "list-occurrences",
+      "test-token"
     );
 
     const responseData = JSON.parse(result.content[0].text);
@@ -116,7 +130,7 @@ describe("list-occurrences tool", () => {
     expect(responseData.instances).toHaveLength(0);
   });
 
-  it("should use lastId for pagination when provided", async () => {
+  it("should use last_id for pagination when provided", async () => {
     makeRollbarRequestMock
       .mockResolvedValueOnce(mockSuccessfulItemResponse)
       .mockResolvedValueOnce({
@@ -127,12 +141,13 @@ describe("list-occurrences tool", () => {
     const result = await toolHandler({
       counter: 42,
       limit: 3,
-      lastId: 998,
+      last_id: 998,
     });
 
     expect(makeRollbarRequestMock).toHaveBeenCalledWith(
-      "https://api.rollbar.com/api/1/item/1/instances?limit=3&lastId=998",
-      "list-occurrences"
+      "https://api.rollbar.com/api/1/item/1/instances?limit=3&last_id=998",
+      "list-occurrences",
+      "test-token"
     );
 
     const responseData = JSON.parse(result.content[0].text);
@@ -158,10 +173,36 @@ describe("list-occurrences tool", () => {
     );
   });
 
-  it("should handle null/undefined item response", async () => {
+  it("should throw on null item response", async () => {
     makeRollbarRequestMock.mockResolvedValueOnce(null);
 
-    await expect(toolHandler({ counter: 42 })).rejects.toThrow();
+    await expect(toolHandler({ counter: 42 })).rejects.toThrow(
+      "Invalid API response",
+    );
+  });
+
+  it("should throw when item result is missing", async () => {
+    makeRollbarRequestMock.mockResolvedValueOnce({ err: 0, result: null });
+
+    await expect(toolHandler({ counter: 42 })).rejects.toThrow("missing item");
+  });
+
+  it("should throw on null occurrences response", async () => {
+    makeRollbarRequestMock
+      .mockResolvedValueOnce(mockSuccessfulItemResponse)
+      .mockResolvedValueOnce(null);
+
+    await expect(toolHandler({ counter: 42 })).rejects.toThrow(
+      "Invalid API response",
+    );
+  });
+
+  it("should throw when occurrences result is missing instances", async () => {
+    makeRollbarRequestMock
+      .mockResolvedValueOnce(mockSuccessfulItemResponse)
+      .mockResolvedValueOnce({ err: 0, result: { page: 1 } });
+
+    await expect(toolHandler({ counter: 42 })).rejects.toThrow("missing instances");
   });
 
   it("should handle exceptions during API call", async () => {
@@ -182,8 +223,8 @@ describe("list-occurrences tool", () => {
     const schema = schemaCall[2];
 
     expect(() => schema.counter.parse(42)).not.toThrow();
-    expect(() => schema.counter.parse(0)).not.toThrow();
-    expect(() => schema.counter.parse(-1)).not.toThrow();
+    expect(() => schema.counter.parse(0)).toThrow();
+    expect(() => schema.counter.parse(-1)).toThrow();
     expect(() => schema.counter.parse(3.14)).toThrow();
     expect(() => schema.counter.parse("42")).toThrow();
     expect(() => schema.counter.parse(null)).toThrow();
@@ -204,21 +245,27 @@ describe("list-occurrences tool", () => {
     const schemaCall = (server.tool as any).mock.calls[0];
     const schema = schemaCall[2];
 
+    expect(() => schema.limit.parse(1)).not.toThrow();
     expect(() => schema.limit.parse(3)).not.toThrow();
-    expect(() => schema.limit.parse(20)).not.toThrow();
-    expect(() => schema.limit.parse(undefined)).not.toThrow(); // Optional
+    expect(() => schema.limit.parse(100)).not.toThrow();
+    expect(() => schema.limit.parse(undefined)).not.toThrow(); // has default
+    expect(() => schema.limit.parse(101)).toThrow(); // exceeds max
+    expect(() => schema.limit.parse(0)).toThrow(); // below min
     expect(() => schema.limit.parse(3.14)).toThrow();
     expect(() => schema.limit.parse("3")).toThrow();
   });
 
-  it("should validate lastId parameter with Zod schema", () => {
+  it("should validate last_id parameter with Zod schema", () => {
     const schemaCall = (server.tool as any).mock.calls[0];
     const schema = schemaCall[2];
 
-    expect(() => schema.lastId.parse(12345)).not.toThrow();
-    expect(() => schema.lastId.parse(undefined)).not.toThrow(); // Optional
-    expect(() => schema.lastId.parse(3.14)).toThrow();
-    expect(() => schema.lastId.parse("12345")).toThrow();
+    expect(() => schema.last_id.parse(12345)).not.toThrow();
+    expect(() => schema.last_id.parse(1)).not.toThrow();
+    expect(() => schema.last_id.parse(undefined)).not.toThrow(); // Optional
+    expect(() => schema.last_id.parse(0)).toThrow(); // below min
+    expect(() => schema.last_id.parse(-1)).toThrow(); // negative
+    expect(() => schema.last_id.parse(3.14)).toThrow();
+    expect(() => schema.last_id.parse("12345")).toThrow();
   });
 
   it("should format response as compact valid JSON", async () => {

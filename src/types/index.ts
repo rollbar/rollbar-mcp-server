@@ -63,7 +63,7 @@ export interface RollbarOccurrenceResponse {
   id: number;
   item_id: number;
   timestamp: number;
-  version: number;
+  version?: number | string;
   data: {
     body: any;
     level: string;

@@ -4,12 +4,13 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { registerAllTools } from "./tools/index.js";
 import { registerAllResources } from "./resources/index.js";
+import packageJson from "../package.json" assert { type: "json" };
 
 // Create server instance
 const server = new McpServer(
   {
     name: "rollbar",
-    version: "0.0.1",
+    version: packageJson.version,
   },
   {
     capabilities: {
