@@ -179,8 +179,8 @@ describe('get-item-details tool', () => {
     const schema = schemaCall[2];
     
     expect(() => schema.counter.parse(42)).not.toThrow();
-    expect(() => schema.counter.parse(0)).not.toThrow();
-    expect(() => schema.counter.parse(-1)).not.toThrow();
+    expect(() => schema.counter.parse(0)).toThrow();
+    expect(() => schema.counter.parse(-1)).toThrow();
     expect(() => schema.counter.parse(3.14)).toThrow();
     expect(() => schema.counter.parse('42')).toThrow();
     expect(() => schema.counter.parse(null)).toThrow();

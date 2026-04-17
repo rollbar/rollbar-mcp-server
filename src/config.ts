@@ -2,7 +2,7 @@ import "./load-env.js";
 import { readFileSync, existsSync } from "node:fs";
 import path from "node:path";
 import { homedir } from "node:os";
-import packageJson from "../package.json" with { type: "json" };
+import packageJson from "../package.json" assert { type: "json" };
 import { z } from "zod";
 
 const DEFAULT_ROLLBAR_API_BASE = "https://api.rollbar.com/api/1";
@@ -123,10 +123,9 @@ function loadProjectsFromFile(filePath: string): ProjectConfig[] | null {
   );
 }
 
-function exitWithError(message: string): never {
+function throwConfigError(message: string): never {
   console.error(message);
-  process.exit(1);
-  return undefined as never;
+  throw new Error(message);
 }
 
 function loadConfig(): ProjectConfig[] {
@@ -142,11 +141,11 @@ function loadConfig(): ProjectConfig[] {
         return projects;
       }
     } catch (error) {
-      return exitWithError(
+      return throwConfigError(
         error instanceof Error ? error.message : "Invalid Rollbar config file",
       );
     }
-    return exitWithError(
+    return throwConfigError(
       `Error: ROLLBAR_CONFIG_FILE="${configFileEnv}" was not found.`,
     );
   }
@@ -157,7 +156,7 @@ function loadConfig(): ProjectConfig[] {
     const fromCwd = loadProjectsFromFile(cwdPath);
     if (fromCwd) return fromCwd;
   } catch (error) {
-    return exitWithError(
+    return throwConfigError(
       error instanceof Error ? error.message : "Invalid Rollbar config file",
     );
   }
@@ -168,7 +167,7 @@ function loadConfig(): ProjectConfig[] {
     const fromHome = loadProjectsFromFile(homePath);
     if (fromHome) return fromHome;
   } catch (error) {
-    return exitWithError(
+    return throwConfigError(
       error instanceof Error ? error.message : "Invalid Rollbar config file",
     );
   }
@@ -178,7 +177,7 @@ function loadConfig(): ProjectConfig[] {
   if (token && token.length > 0) {
     const apiBase = resolveApiBaseFromEnv();
     if (apiBase === null) {
-      return exitWithError(
+      return throwConfigError(
         "Error: ROLLBAR_API_BASE must be a valid HTTP(S) URL when using ROLLBAR_ACCESS_TOKEN.",
       );
     }
@@ -191,7 +190,7 @@ function loadConfig(): ProjectConfig[] {
     ];
   }
 
-  return exitWithError(
+  return throwConfigError(
     "Error: No Rollbar configuration found. Set ROLLBAR_ACCESS_TOKEN, or create .rollbar-mcp.json (in cwd or home), or set ROLLBAR_CONFIG_FILE.",
   );
 }

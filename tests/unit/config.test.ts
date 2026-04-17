@@ -12,7 +12,7 @@ describe('config utilities', () => {
     if (originalToken === undefined) {
       process.env.ROLLBAR_ACCESS_TOKEN = 'test-token';
     }
-    const packageJsonModule = await import('../../package.json', { with: { type: 'json' } });
+    const packageJsonModule = await import('../../package.json', { assert: { type: 'json' } });
     packageVersion = packageJsonModule.default.version;
 
     const configModule = await import('../../src/config.js');

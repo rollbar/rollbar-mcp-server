@@ -63,7 +63,7 @@ export interface RollbarOccurrenceResponse {
   id: number;
   item_id: number;
   timestamp: number;
-  version: number;
+  version?: number | string;
   data: {
     body: any;
     level: string;
@@ -155,5 +155,11 @@ export interface RollbarListItemsResponse {
   page: number;
   total_count: number;
   items: RollbarListItemResponse[];
+  [key: string]: any; // Allow for any other properties
+}
+
+export interface RollbarListOccurrencesResponse {
+  page: number;
+  instances: RollbarOccurrenceResponse[];
   [key: string]: any; // Allow for any other properties
 }

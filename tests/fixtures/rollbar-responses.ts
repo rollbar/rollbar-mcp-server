@@ -1,12 +1,13 @@
-import { 
-  RollbarApiResponse, 
-  RollbarItemResponse, 
+import {
+  RollbarApiResponse,
+  RollbarItemResponse,
   RollbarDeployResponse,
   RollbarVersionsResponse,
   RollbarListItemsResponse,
+  RollbarListOccurrencesResponse,
   RollbarTopItemResponse,
-  RollbarOccurrenceResponse
-} from '../../src/types/index.js';
+  RollbarOccurrenceResponse,
+} from "../../src/types/index.js";
 
 export const mockSuccessfulDeployResponse: RollbarApiResponse<RollbarDeployResponse> = {
   err: 0,
@@ -175,9 +176,65 @@ export const mockSuccessfulReplayResponse: RollbarApiResponse<Record<string, unk
   }
 };
 
+export const mockSuccessfulListOccurrencesResponse: RollbarApiResponse<RollbarListOccurrencesResponse> =
+  {
+    err: 0,
+    result: {
+      page: 1,
+      instances: [
+        {
+          id: 999,
+          item_id: 1,
+          timestamp: 1640001000,
+          version: 1,
+          data: {
+            body: {
+              trace: {
+                frames: [],
+                exception: {
+                  class: "TypeError",
+                  message: "Cannot read property 'foo' of undefined",
+                },
+              },
+            },
+            level: "error",
+            environment: "production",
+            framework: "node",
+            language: "javascript",
+            timestamp: 1640001000,
+            platform: "server",
+          },
+        },
+        {
+          id: 998,
+          item_id: 1,
+          timestamp: 1640000500,
+          version: 1,
+          data: {
+            body: {
+              trace: {
+                frames: [],
+                exception: {
+                  class: "TypeError",
+                  message: "Cannot read property 'foo' of undefined",
+                },
+              },
+            },
+            level: "error",
+            environment: "production",
+            framework: "node",
+            language: "javascript",
+            timestamp: 1640000500,
+            platform: "server",
+          },
+        },
+      ],
+    },
+  };
+
 export const mockErrorResponse = {
   err: 1,
-  message: "Invalid access token"
+  message: "Invalid access token",
 };
 
 export const mock401Response = {

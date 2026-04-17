@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, writeFile, unlink } from "node:fs/promises";
 import path from "node:path";
 import { tmpdir } from "node:os";
 import { z } from "zod";
@@ -49,7 +49,7 @@ async function writeReplayToFile(
     .concat(".json");
 
   const filePath = path.join(REPLAY_FILE_DIRECTORY, fileName);
-  await writeFile(filePath, JSON.stringify(replayData, null, 2), "utf8");
+  await writeFile(filePath, JSON.stringify(replayData, null, 2), { encoding: "utf8", mode: 0o600 });
   return filePath;
 }
 
@@ -70,9 +70,32 @@ export function registerGetReplayTool(server: McpServer) {
       delivery: DELIVERY_MODE.optional().describe(
         "How to return the replay payload. Defaults to 'file' (writes JSON to a temp file); 'resource' returns a rollbar:// link.",
       ),
+      cleanup: z
+        .boolean()
+        .optional()
+        .describe(
+          "When delivery='file', if true, schedules automatic deletion of the file after a default TTL (10 minutes).",
+        ),
+      cleanup_ttl_seconds: z
+        .number()
+        .int()
+        .min(5)
+        .max(86400)
+        .optional()
+        .describe(
+          "When delivery='file', optional TTL in seconds to delete the file automatically. Overrides 'cleanup'.",
+        ),
       project: buildProjectParam(),
     },
-    async ({ environment, sessionId, replayId, delivery, project }) => {
+    async ({
+      environment,
+      sessionId,
+      replayId,
+      delivery,
+      cleanup,
+      cleanup_ttl_seconds,
+      project,
+    }) => {
       const deliveryMode = delivery ?? "file";
       const { token, apiBase } = resolveProject(project);
 
@@ -105,12 +128,27 @@ export function registerGetReplayTool(server: McpServer) {
           sessionId,
           replayId,
         );
+        const ttl =
+          typeof cleanup_ttl_seconds === "number"
+            ? cleanup_ttl_seconds
+            : cleanup
+              ? 600
+              : undefined;
+        if (ttl) {
+          // Best-effort cleanup; ignore errors
+          setTimeout(() => {
+            void unlink(filePath).catch(() => {});
+          }, ttl * 1000);
+        }
 
         return {
           content: [
             {
               type: "text",
-              text: `Replay ${replayId} for session ${sessionId} in ${environment} saved to ${filePath}. This file is not automatically deleted—remove it when finished or rerun with delivery="resource" for a rollbar:// link.`,
+              text:
+                ttl !== undefined
+                  ? `Replay ${replayId} for session ${sessionId} in ${environment} saved to ${filePath}. This file is scheduled for automatic deletion in ${ttl} seconds.`
+                  : `Replay ${replayId} for session ${sessionId} in ${environment} saved to ${filePath}. This file is not automatically deleted—remove it when finished or rerun with delivery="resource" for a rollbar:// link.`,
             },
           ],
         };
