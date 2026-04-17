@@ -1,13 +1,9 @@
-import dotenv from "dotenv";
+import "./load-env.js";
 import { readFileSync, existsSync } from "node:fs";
 import path from "node:path";
 import { homedir } from "node:os";
 import packageJson from "../package.json" with { type: "json" };
 import { z } from "zod";
-
-// Load environment variables from .env file
-// `quiet: true` to prevent logging to stdio which disrupts some mcp clients
-dotenv.config({ quiet: true } as Parameters<typeof dotenv.config>[0]);
 
 const DEFAULT_ROLLBAR_API_BASE = "https://api.rollbar.com/api/1";
 
