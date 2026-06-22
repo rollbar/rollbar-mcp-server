@@ -96,7 +96,7 @@ export function registerListItemsTool(server: McpServer) {
       }
 
       if (query) {
-        params.append("q", query);
+        params.append("query", query);
       }
 
       const listUrl = `${apiBase}/items/?${params.toString()}`;
