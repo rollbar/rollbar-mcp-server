@@ -100,7 +100,7 @@ describe('list-items tool', () => {
     });
 
     expect(makeRollbarRequestMock).toHaveBeenCalledWith(
-      'https://api.rollbar.com/api/1/items/?status=resolved&level=error&level=critical&environment=staging&page=2&q=TypeError',
+      'https://api.rollbar.com/api/1/items/?status=resolved&level=error&level=critical&environment=staging&page=2&query=TypeError',
       'list-items',
       'test-token'
     );
