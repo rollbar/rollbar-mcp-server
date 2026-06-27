@@ -4,6 +4,7 @@ import { registerGetDeploymentsTool } from "./get-deployments.js";
 import { registerGetVersionTool } from "./get-version.js";
 import { registerGetTopItemsTool } from "./get-top-items.js";
 import { registerListItemsTool } from "./list-items.js";
+import { registerListOccurrencesTool } from "./list-occurrences.js";
 import { registerUpdateItemTool } from "./update-item.js";
 import { registerGetReplayTool } from "./get-replay.js";
 import { registerListProjectsTool } from "./list-projects.js";
@@ -14,6 +15,7 @@ export function registerAllTools(server: McpServer) {
   registerGetVersionTool(server);
   registerGetTopItemsTool(server);
   registerListItemsTool(server);
+  registerListOccurrencesTool(server);
   registerUpdateItemTool(server);
   registerGetReplayTool(server);
   registerListProjectsTool(server);

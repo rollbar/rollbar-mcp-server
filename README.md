@@ -57,9 +57,13 @@ If a config file exists but is invalid, the server exits with an error instead o
 
 `list-items(status?, level?, environment?, page?, limit?, query?, project?)`: List items filtered by status, environment, and search query. Optional `project` when multiple projects are configured.
 
+`list-occurrences(counter, limit?, page?, last_id?, project?)`: List occurrences (instances) for a Rollbar item by its counter. `limit` defaults to 3, max 100. Use `last_id` (the `id` of the last occurrence from a previous page) for reliable cursor-based pagination; it takes precedence over `page` when both are provided. Optional `project` when multiple projects are configured. (Deprecated alias: `lastId` is accepted but `last_id` is preferred and sent to the API.) Example prompt: `Show me the last 3 occurrences of item #24265`
+
 `get-replay(environment, sessionId, replayId, delivery?, project?)`: Retrieve session replay metadata and payload for a specific session. By default the tool writes the replay JSON to a temporary file (under your system temp directory) and returns the path. Set `delivery="resource"` to receive a `rollbar://replay/<environment>/<sessionId>/<replayId>` link for MCP-aware clients. Optional `project` when multiple projects are configured. `delivery="resource"` is only supported in single-project mode; when multiple projects are configured, use `delivery="file"` with a `project` parameter instead. Example prompt: `Fetch the replay 789 from session abc in staging`.
 
 `update-item(itemId, status?, level?, title?, assignedUserId?, resolvedInVersion?, snoozed?, teamId?, project?)`: Update an item's properties including status, level, title, assignment, and more. Optional `project` when multiple projects are configured. Example prompt: `Mark Rollbar item #123456 as resolved` or `Assign item #123456 to user ID 789`. (Requires `write` scope)
+
+Note: When using `get-replay` with `delivery=\"file\"`, you can enable automatic cleanup of the temporary JSON file with `cleanup=true` (deletes after ~10 minutes) or provide a custom TTL using `cleanup_ttl_seconds` (range 5–86400 seconds).
 
 ## How to Use
 
