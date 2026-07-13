@@ -50,12 +50,12 @@ async function handleSSEConnection(req: IncomingMessage, res: ServerResponse) {
   });
 }
 
-async function main() {
-  const httpServer = createServer(async (req, res) => {
+function main() {
+  const httpServer = createServer((req, res) => {
     const url = new URL(req.url || "/", `http://${req.headers.host}`);
 
     if (url.pathname === "/sse") {
-      await handleSSEConnection(req, res);
+      void handleSSEConnection(req, res);
     } else if (url.pathname === "/health") {
       res.setHeader("Content-Type", "application/json");
       res.writeHead(200);
@@ -72,7 +72,4 @@ async function main() {
   });
 }
 
-main().catch((error) => {
-  console.error("Fatal error in main():", error);
-  process.exit(1);
-});
+main();

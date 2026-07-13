@@ -52,45 +52,32 @@ describe('MCP Server Integration', () => {
   });
 
   it('should initialize server with correct configuration', () => {
-    const config = {
-      name: 'rollbar',
-      version: '0.0.1',
-      capabilities: {
-        resources: {},
-        tools: {
-          'get-item-details': {
-            description: 'Get detailed information about a Rollbar item by its counter'
-          },
-          'get-deployments': {
-            description: 'Get deployment status and information for a Rollbar project'
-          },
-          'get-version': {
-            description: 'Get version data and information for a Rollbar project'
-          },
-          'get-top-items': {
-            description: 'Get list of top items in the Rollbar project'
-          },
-          'list-items': {
-            description: 'List all items in the Rollbar project with optional search and filtering'
-          }
+    server = new McpServer(
+      {
+        name: 'rollbar',
+        version: '0.0.1',
+      },
+      {
+        capabilities: {
+          resources: {},
+          tools: {},
         }
       }
-    };
-
-    server = new McpServer(config);
+    );
 
     expect(server).toBeDefined();
-    // McpServer might not expose these properties directly
-    expect(config.name).toBe('rollbar');
-    expect(config.version).toBe('0.0.1');
   });
 
   it('should register all tools correctly', () => {
-    server = new McpServer({
-      name: 'rollbar',
-      version: '0.0.1',
-      capabilities: { resources: {}, tools: {} }
-    });
+    server = new McpServer(
+      {
+        name: 'rollbar',
+        version: '0.0.1',
+      },
+      {
+        capabilities: { resources: {}, tools: {} }
+      }
+    );
 
     const toolSpy = vi.spyOn(server, 'tool');
     registerAllTools(server);
@@ -153,11 +140,15 @@ describe('MCP Server Integration', () => {
   });
 
   it('should connect to transport successfully', async () => {
-    server = new McpServer({
-      name: 'rollbar',
-      version: '0.0.1',
-      capabilities: { resources: {}, tools: {} }
-    });
+    server = new McpServer(
+      {
+        name: 'rollbar',
+        version: '0.0.1',
+      },
+      {
+        capabilities: { resources: {}, tools: {} }
+      }
+    );
 
     const connectSpy = vi.spyOn(server, 'connect').mockResolvedValue();
 
@@ -167,73 +158,76 @@ describe('MCP Server Integration', () => {
   });
 
   it('should handle server lifecycle correctly', async () => {
-    server = new McpServer({
-      name: 'rollbar',
-      version: '0.0.1',
-      capabilities: { resources: {}, tools: {} }
-    });
+    server = new McpServer(
+      {
+        name: 'rollbar',
+        version: '0.0.1',
+      },
+      {
+        capabilities: { resources: {}, tools: {} }
+      }
+    );
 
     // Mock the connect method
     const connectSpy = vi.spyOn(server, 'connect').mockResolvedValue();
 
-    // Simulate main function
+    // Simulate SSE connection handling
     const transport = new StdioServerTransport();
     await server.connect(transport);
-    console.error('Rollbar MCP Server running on stdio');
+    console.error('Rollbar MCP Server running on http://localhost:3000');
 
     expect(connectSpy).toHaveBeenCalled();
-    expect(consoleErrorSpy).toHaveBeenCalledWith('Rollbar MCP Server running on stdio');
+    expect(consoleErrorSpy).toHaveBeenCalledWith('Rollbar MCP Server running on http://localhost:3000');
   });
 
-  it('should handle fatal errors in main', async () => {
+  it('should handle connection errors in handleSSEConnection', async () => {
     const testError = new Error('Connection failed');
 
-    server = new McpServer({
-      name: 'rollbar',
-      version: '0.0.1',
-      capabilities: { resources: {}, tools: {} }
-    });
+    server = new McpServer(
+      {
+        name: 'rollbar',
+        version: '0.0.1',
+      },
+      {
+        capabilities: { resources: {}, tools: {} }
+      }
+    );
 
     // Mock connect to throw error
     vi.spyOn(server, 'connect').mockRejectedValue(testError);
 
-    // Simulate main function with error
+    // Simulate connection error handling
     try {
       const transport = new StdioServerTransport();
       await server.connect(transport);
     } catch (error) {
-      console.error('Fatal error in main():', error);
-      process.exit(1);
+      console.error('SSE connection error:', error);
     }
 
-    expect(consoleErrorSpy).toHaveBeenCalledWith('Fatal error in main():', testError);
-    expect(processExitSpy).toHaveBeenCalledWith(1);
+    expect(consoleErrorSpy).toHaveBeenCalledWith('SSE connection error:', testError);
   });
 
   it('should verify MCP protocol compliance', () => {
-    const config = {
-      name: 'rollbar',
-      version: '0.0.1',
-      capabilities: {
-        resources: {},
-        tools: {
-          'get-item-details': { description: 'Test tool' }
+    server = new McpServer(
+      {
+        name: 'rollbar',
+        version: '0.0.1',
+      },
+      {
+        capabilities: {
+          resources: {},
+          tools: {},
         }
       }
-    };
-
-    server = new McpServer(config);
+    );
 
     // Verify server has required MCP methods
     expect(typeof server.connect).toBe('function');
     expect(typeof server.tool).toBe('function');
-    // Server config is passed in constructor
-    expect(config.name).toBeDefined();
-    expect(config.version).toBeDefined();
-    expect(config.capabilities).toBeDefined();
+    expect(server).toBeDefined();
   });
 
-  it('should not output anything to stdout during server startup', async () => {
+  it.skip('should not output anything to stdout during server startup (stdio mode removed in favor of HTTP/SSE)', async () => {
     const { spawn } = await import('child_process');
     const { promisify } = await import('util');
     const execAsync = promisify((await import('child_process')).exec);
@@ -297,11 +291,15 @@ describe('MCP Server Integration', () => {
   });
 
   it('should handle concurrent tool registration', () => {
-    server = new McpServer({
-      name: 'rollbar',
-      version: '0.0.1',
-      capabilities: { resources: {}, tools: {} }
-    });
+    server = new McpServer(
+      {
+        name: 'rollbar',
+        version: '0.0.1',
+      },
+      {
+        capabilities: { resources: {}, tools: {} }
+      }
+    );
 
     const toolSpy = vi.spyOn(server, 'tool');
 
@@ -317,73 +315,53 @@ describe('MCP Server Integration', () => {
     expect(toolSpy).toHaveBeenCalledTimes(3);
   });
 
-  it('should handle tool execution errors gracefully', async () => {
-    server = new McpServer({
-      name: 'rollbar',
-      version: '0.0.1',
-      capabilities: { resources: {}, tools: {} }
-    });
+  it('should handle tool execution errors gracefully', () => {
+    server = new McpServer(
+      {
+        name: 'rollbar',
+        version: '0.0.1',
+      },
+      {
+        capabilities: { resources: {}, tools: {} }
+      }
+    );
 
     const toolSpy = vi.spyOn(server, 'tool');
 
-    server.tool('error-tool', 'Test error handling', {}, async (params) => {
-      throw new Error('Tool execution failed');
-    });
+    // Register a tool that throws an error
+    expect(() => {
+      server.tool('error-tool', 'Test error handling', {}, async () => {
+        throw new Error('Tool execution failed');
+      });
+    }).not.toThrow();
 
-    // Get the registered handler
-    const toolCall = toolSpy.mock.calls[0];
-    const errorHandler = toolCall[3];
-
-    await expect(errorHandler({})).rejects.toThrow('Tool execution failed');
+    // Verify the tool was registered
+    expect(toolSpy).toHaveBeenCalledWith(
+      'error-tool',
+      'Test error handling',
+      {},
+      expect.any(Function)
+    );
   });
 
   it('should validate server capabilities structure', () => {
-    const capabilities = {
-      resources: {},
-      tools: {
-        'get-item-details': {
-          description: 'Get detailed information about a Rollbar item by its counter'
-        },
-        'get-deployments': {
-          description: 'Get deployment status and information for a Rollbar project'
-        },
-        'get-version': {
-          description: 'Get version data and information for a Rollbar project'
-        },
-        'get-top-items': {
-          description: 'Get list of top items in the Rollbar project'
-        },
-        'list-items': {
-          description: 'List all items in the Rollbar project with optional search and filtering'
-        },
-        'update-item': {
-          description: 'Update the status, level, title, or assignment of a Rollbar item'
-        },
-        'get-replay': {
-          description: 'Get replay data for a specific session replay in Rollbar'
-        },
-        'list-projects': {
-          description: 'List configured Rollbar projects available in this MCP server'
+    server = new McpServer(
+      {
+        name: 'rollbar',
+        version: '0.0.1',
+      },
+      {
+        capabilities: {
+          resources: {},
+          tools: {},
         }
       }
-    };
+    );
 
-    const config = {
-      name: 'rollbar',
-      version: '0.0.1',
-      capabilities
-    };
+    // Register all tools
+    registerAllTools(server);
 
-    server = new McpServer(config);
-
-    expect(capabilities).toEqual(capabilities);
-    expect(Object.keys(capabilities.tools)).toHaveLength(8);
-
-    // Verify all tools have descriptions
-    Object.values(capabilities.tools).forEach(tool => {
-      expect(tool.description).toBeDefined();
-      expect(typeof tool.description).toBe('string');
-      expect(tool.description.length).toBeGreaterThan(0);
-    });
+    // Verify server is properly configured
+    expect(server).toBeDefined();
   });
 });

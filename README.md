@@ -16,6 +16,25 @@ Most users should use stdio mode for local development. HTTP mode is useful for:
 
 ### Configuration
 
+**Multiple Projects: AWS Secrets Manager (recommended for production)**
+
+Set `ROLLBAR_AWS_SECRET_NAME` to the name of your AWS Secrets Manager secret. The secret should contain a JSON object with project names as keys and tokens as values:
+
+```json
+{
+  "backend": "tok_abc123",
+  "frontend": "tok_xyz789",
+  "mobile": "tok_def456"
+}
+```
+
+Environment variables:
+- `ROLLBAR_AWS_SECRET_NAME`: Name of the AWS Secrets Manager secret (e.g., `prod/rollbar-mcp/project-tokens`)
+- `AWS_REGION`: AWS region for Secrets Manager (defaults to `us-east-1`)
+- `ROLLBAR_API_BASE` (optional): override the API base URL (defaults to `https://api.rollbar.com/api/1`)
+
+AWS credentials are sourced from the standard AWS SDK credential chain (environment variables, IAM roles, AWS profiles, etc.).
+
 **Single Project: Environment variable (single project, backward compatible)**
 
 - `ROLLBAR_ACCESS_TOKEN`: access token for your Rollbar project.
@@ -42,14 +61,15 @@ Multiple projects:
 }
 ```
 
-Config file lookup order:
+**Configuration lookup order:**
 
-1. `ROLLBAR_CONFIG_FILE` env var
-2. `.rollbar-mcp.json` in current working directory
-3. `~/.rollbar-mcp.json` in home directory
-4. `ROLLBAR_ACCESS_TOKEN` env var (single project, backward compatible)
+1. `ROLLBAR_AWS_SECRET_NAME` env var (AWS Secrets Manager)
+2. `ROLLBAR_CONFIG_FILE` env var
+3. `.rollbar-mcp.json` in current working directory
+4. `~/.rollbar-mcp.json` in home directory
+5. `ROLLBAR_ACCESS_TOKEN` env var (single project, backward compatible)
 
-If a config file exists but is invalid, the server exits with an error instead of falling back to a lower-priority config source.
+If a config source exists but is invalid, the server exits with an error instead of falling back to a lower-priority config source.
 
 ### Tools
 
@@ -78,6 +98,9 @@ Tested with node 20 and 22 (`nvm use 22`).
 Run as a standalone HTTP server:
 
 ```bash
+# Using AWS Secrets Manager (multiple projects, recommended for production)
+PORT=3000 ROLLBAR_AWS_SECRET_NAME=prod/rollbar-mcp/project-tokens AWS_REGION=us-east-1 node build/index.js
+
 # Using environment variable (single project)
 PORT=3000 ROLLBAR_ACCESS_TOKEN=your_token node build/index.js
 
@@ -91,6 +114,8 @@ The server provides these endpoints:
 
 Environment variables:
 - `PORT` - HTTP server port (default: 3000)
+- `ROLLBAR_AWS_SECRET_NAME` - AWS Secrets Manager secret name (multiple projects mode)
+- `AWS_REGION` - AWS region for Secrets Manager (defaults to `us-east-1`)
 - `ROLLBAR_ACCESS_TOKEN` - Your Rollbar project token (single project mode)
 - `ROLLBAR_CONFIG_FILE` - Path to config file (single or multiple projects)
 - `ROLLBAR_API_BASE` - Override API base URL (optional)

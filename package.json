@@ -45,6 +45,7 @@
     "js-yaml": "^4.1.1"
   },
   "dependencies": {
+    "@aws-sdk/client-secrets-manager": "^3.1085.0",
     "@modelcontextprotocol/sdk": "^1.26.0",
     "dotenv": "^17.2.1",
     "rollbar": "^3.0.0-alpha.6",

@@ -123,14 +123,89 @@ function loadProjectsFromFile(filePath: string): ProjectConfig[] | null {
   );
 }
 
+async function loadProjectsFromAwsSecretsManager(
+  secretName: string,
+): Promise<ProjectConfig[] | null> {
+  try {
+    const { SecretsManagerClient, GetSecretValueCommand } =
+      await import("@aws-sdk/client-secrets-manager");
+
+    const client = new SecretsManagerClient({
+      region: process.env.AWS_REGION || "us-east-1",
+    });
+
+    const command = new GetSecretValueCommand({
+      SecretId: secretName,
+    });
+
+    const response = await client.send(command);
+
+    if (!response.SecretString) {
+      throw new Error(`Secret "${secretName}" has no string value`);
+    }
+
+    const secrets = JSON.parse(response.SecretString) as Record<string, string>;
+
+    const apiBase = normalizeApiBase(process.env.ROLLBAR_API_BASE);
+
+    const projects: ProjectConfig[] = Object.entries(secrets).map(
+      ([projectName, token]) => ({
+        name: projectName,
+        token,
+        apiBase,
+      }),
+    );
+
+    if (projects.length === 0) {
+      throw new Error(`Secret "${secretName}" contains no project tokens`);
+    }
+
+    return projects;
+  } catch (error) {
+    if (
+      error &&
+      typeof error === "object" &&
+      "name" in error &&
+      error.name === "ResourceNotFoundException"
+    ) {
+      return null;
+    }
+    const message =
+      error instanceof Error
+        ? error.message
+        : "Unknown error fetching from AWS Secrets Manager";
+    throw new Error(
+      `Failed to load projects from AWS Secrets Manager ("${secretName}"): ${message}`,
+    );
+  }
+}
+
 function exitWithError(message: string): never {
   console.error(message);
   process.exit(1);
   return undefined as never;
 }
 
-function loadConfig(): ProjectConfig[] {
-  // 1. ROLLBAR_CONFIG_FILE env var
+async function loadConfig(): Promise<ProjectConfig[]> {
+  // 1. AWS Secrets Manager — ROLLBAR_AWS_SECRET_NAME env var
+  const awsSecretName = process.env.ROLLBAR_AWS_SECRET_NAME?.trim();
+  if (awsSecretName) {
+    try {
+      const projects = await loadProjectsFromAwsSecretsManager(awsSecretName);
+      if (projects) {
+        return projects;
+      }
+    } catch (error) {
+      return exitWithError(
+        error instanceof Error
+          ? error.message
+          : "Failed to load from AWS Secrets Manager",
+      );
+    }
+    return exitWithError(`Error: AWS Secret "${awsSecretName}" was not found.`);
+  }
+
+  // 2. ROLLBAR_CONFIG_FILE env var
   const configFileEnv = process.env.ROLLBAR_CONFIG_FILE?.trim();
   if (configFileEnv) {
     const resolved = path.isAbsolute(configFileEnv)
@@ -151,7 +226,7 @@ function loadConfig(): ProjectConfig[] {
     );
   }
 
-  // 2. .rollbar-mcp.json in process.cwd()
+  // 3. .rollbar-mcp.json in process.cwd()
   const cwdPath = path.join(process.cwd(), ".rollbar-mcp.json");
   try {
     const fromCwd = loadProjectsFromFile(cwdPath);
@@ -162,7 +237,7 @@ function loadConfig(): ProjectConfig[] {
     );
   }
 
-  // 3. ~/.rollbar-mcp.json
+  // 4. ~/.rollbar-mcp.json
   const homePath = path.join(homedir(), ".rollbar-mcp.json");
   try {
     const fromHome = loadProjectsFromFile(homePath);
@@ -173,7 +248,7 @@ function loadConfig(): ProjectConfig[] {
     );
   }
 
-  // 4. ROLLBAR_ACCESS_TOKEN env var — synthesize single project
+  // 5. ROLLBAR_ACCESS_TOKEN env var — synthesize single project
   const token = process.env.ROLLBAR_ACCESS_TOKEN?.trim();
   if (token && token.length > 0) {
     const apiBase = resolveApiBaseFromEnv();
@@ -192,11 +267,11 @@ function loadConfig(): ProjectConfig[] {
   }
 
   return exitWithError(
-    "Error: No Rollbar configuration found. Set ROLLBAR_ACCESS_TOKEN, or create .rollbar-mcp.json (in cwd or home), or set ROLLBAR_CONFIG_FILE.",
+    "Error: No Rollbar configuration found. Set ROLLBAR_AWS_SECRET_NAME for AWS Secrets Manager, set ROLLBAR_ACCESS_TOKEN, or create .rollbar-mcp.json (in cwd or home), or set ROLLBAR_CONFIG_FILE.",
   );
 }
 
-export const PROJECTS: ProjectConfig[] = loadConfig();
+export const PROJECTS: ProjectConfig[] = await loadConfig();
 
 export function resolveProject(name: string | undefined): ProjectConfig {
   if (PROJECTS.length === 1 && name === undefined) {
