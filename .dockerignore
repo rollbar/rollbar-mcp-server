@@ -1,0 +1,41 @@
+# Node modules
+node_modules
+npm-debug.log
+
+# Build output (will be copied from builder stage)
+build
+
+# Git
+.git
+.gitignore
+
+# CI/CD
+.github
+
+# Tests
+tests
+*.test.ts
+*.spec.ts
+coverage
+
+# Documentation
+*.md
+!README.md
+
+# Development files
+.env
+.env.local
+.rollbar-mcp.json
+.rollbar-mcp-example.json
+*.log
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db

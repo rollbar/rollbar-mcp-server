@@ -1,0 +1,44 @@
+name: Deploy
+
+on:
+  workflow_call:
+    inputs:
+      version-tag:
+        description: 'Version tag to deploy'
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      commit:
+        description: Commit hash to deploy. Leave empty to deploy HEAD.
+        required: false
+        type: string
+
+jobs:
+  resolve-version-tag:
+    name: Resolve version tag
+    runs-on: ubuntu-latest
+    outputs:
+      version-tag: ${{ steps.resolve.outputs.version-tag }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Resolve version tag
+        id: resolve
+        run: |
+          if [ -z "${{ inputs.version-tag }}" ]; then
+            COMMIT="${{ inputs.commit }}"
+            if [ -z "$COMMIT" ]; then
+              COMMIT=$(git rev-parse --short=7 HEAD)
+            fi
+            echo "version-tag=$COMMIT" >> "$GITHUB_OUTPUT"
+          else
+            echo "version-tag=${{ inputs.version-tag }}" >> "$GITHUB_OUTPUT"
+          fi
+
+  deploy:
+    name: Deploy to Production
+    needs: resolve-version-tag
+    uses: fetch-rewards/common-workflows/.github/workflows/run-fsd.yml@main
+    with:
+      cmd_args: service ecs deploy --env prod --account fetch-admin --version ${{ needs.resolve-version-tag.outputs.version-tag }} rollbar-mcp-server.yml
+    secrets: inherit

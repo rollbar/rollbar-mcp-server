@@ -1,0 +1,32 @@
+variables:
+  prod:
+    aws_account_id: "705747465351"
+
+artifact:
+  ecr_repository: "fetchrewards/rollbar-mcp-server"
+  image_tag: "{{ version }}"
+
+process:
+  port: 3000
+  environment_variables:
+    ENVIRONMENT: "{{ env }}"
+    AWS_REGION: "{{ region }}"
+    NODE_ENV: "production"
+    PORT: "3000"
+  healthcheck_url: /health
+
+dependencies:
+  # Rollbar access tokens stored in AWS Secrets Manager
+  - type: aws_secretsmanager_secret
+    name: "prod/rollbar-mcp-server/config"
+    unmanaged:
+      update_policy: create_only
+      permissions: read
+
+tags:
+  repo: "https://github.com/rollbar/rollbar-mcp-server"
+  tier: "2"
+  service_name: "{{ service }}"
+  pack: "core-services"
+  slack: "pack-core-services"
+  environment: "{{ env }}"

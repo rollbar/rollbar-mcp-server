@@ -4,7 +4,15 @@ A Model Context Protocol (MCP) server for [Rollbar](https://rollbar.com).
 
 ## Features
 
-This MCP server implements the `stdio` server type, which means your AI tool (e.g. Claude, Cursor) will run it directly; you don't run a separate process or connect over http.
+This MCP server supports two transport modes:
+
+- **HTTP/SSE mode**: Run as a standalone HTTP server with Server-Sent Events for remote access or web-based clients
+- **stdio mode** (legacy): Your AI tool (e.g. Claude, Cursor) runs it directly as a subprocess
+
+Most users should use stdio mode for local development. HTTP mode is useful for:
+- Remote server deployments
+- Web-based MCP clients
+- Shared team access to a single Rollbar MCP instance
 
 ### Configuration
 
@@ -65,7 +73,37 @@ If a config file exists but is invalid, the server exits with an error instead o
 
 Tested with node 20 and 22 (`nvm use 22`).
 
-### Claude Code
+### HTTP Server Mode
+
+Run as a standalone HTTP server:
+
+```bash
+# Using environment variable (single project)
+PORT=3000 ROLLBAR_ACCESS_TOKEN=your_token node build/index.js
+
+# Using config file (single or multiple projects)
+PORT=3000 ROLLBAR_CONFIG_FILE=/path/to/.rollbar-mcp.json node build/index.js
+```
+
+The server provides these endpoints:
+- `http://localhost:3000/sse` - MCP protocol over Server-Sent Events
+- `http://localhost:3000/health` - Health check endpoint (returns `{"status":"ok"}`)
+
+Environment variables:
+- `PORT` - HTTP server port (default: 3000)
+- `ROLLBAR_ACCESS_TOKEN` - Your Rollbar project token (single project mode)
+- `ROLLBAR_CONFIG_FILE` - Path to config file (single or multiple projects)
+- `ROLLBAR_API_BASE` - Override API base URL (optional)
+
+The HTTP server supports CORS for cross-origin requests and can be accessed by web-based MCP clients or deployed as a shared service.
+
+**For Fetch Rewards deployments**: See [DEPLOYMENT.md](DEPLOYMENT.md) for instructions on deploying to production via FSD (Fetch Service Deployer).
+
+### stdio Mode (Local Development)
+
+The following configurations use stdio mode where the MCP server runs as a subprocess of your AI tool.
+
+#### Claude Code
 
 Configure your `.mcp.json` as follows.
 
@@ -106,7 +144,7 @@ Using a config file (single or multiple projects):
 ```
 
 
-### Codex CLI
+#### Codex CLI
 
 Add to your `~/.codex/config.toml`:
 
@@ -127,7 +165,7 @@ env = { "ROLLBAR_CONFIG_FILE" = "/path/to/.rollbar-mcp.json" }
 ```
 
 
-### Junie
+#### Junie
 
 Configure your `.junie/mcp/mcp.json` as follows (env var or `ROLLBAR_CONFIG_FILE` for config file):
 
@@ -147,7 +185,7 @@ Configure your `.junie/mcp/mcp.json` as follows (env var or `ROLLBAR_CONFIG_FILE
 ```
 
 
-### Cursor
+#### Cursor
 
 Configure Cursor’s MCP servers (Cursor Settings → Features → MCP, or search for “MCP” in settings). Use either an environment variable or a config file.
 
@@ -187,7 +225,7 @@ With a config file (single or multiple projects):
 
 Restart Cursor (or reload the window) after changing MCP settings. To use a local build instead of npx, see CONTRIBUTING.md.
 
-### VS Code
+#### VS Code
 
 Configure your `.vscode/mcp.json` as follows (env var or `ROLLBAR_CONFIG_FILE` for config file):
 

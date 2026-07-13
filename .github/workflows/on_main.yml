@@ -1,0 +1,54 @@
+name: On Main Branch
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  test:
+    name: Run Tests
+    uses: ./.github/workflows/ci.yml
+    secrets: inherit
+
+  snyk-scan:
+    name: Snyk Security Scan
+    uses: fetch-rewards/common-workflows/.github/workflows/snyk-scan.yml@main
+    with:
+      private-artifact-registry: npm
+      snyk-org: Core Services
+      severity-threshold: critical
+    secrets: inherit
+
+  export-image-tag:
+    name: Export Image Tag
+    runs-on: ubuntu-latest
+    outputs:
+      image-tag: ${{ steps.export.outputs.image-tag }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Export image tag
+        id: export
+        run: |
+          SHORT_SHA=$(git rev-parse --short=7 HEAD)
+          echo "image-tag=$SHORT_SHA" >> "$GITHUB_OUTPUT"
+          echo "Image tag: $SHORT_SHA"
+
+  build-and-publish-image:
+    name: Build and Publish Image
+    needs: [test, snyk-scan, export-image-tag]
+    uses: fetch-rewards/common-workflows/.github/workflows/publish-ecr.yml@main
+    with:
+      version-tag: ${{ needs.export-image-tag.outputs.image-tag }}
+      service-name: ${{ github.event.repository.name }}
+      private-artifact-registry: npm
+      use-short-sha: true
+    secrets: inherit
+
+  deploy:
+    name: Deploy to Production
+    needs: build-and-publish-image
+    uses: ./.github/workflows/deploy.yml
+    with:
+      version-tag: ${{ needs.build-and-publish-image.outputs.version-tag }}
+    secrets: inherit
