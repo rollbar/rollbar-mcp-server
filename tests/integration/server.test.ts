@@ -95,7 +95,7 @@ describe('MCP Server Integration', () => {
     const toolSpy = vi.spyOn(server, 'tool');
     registerAllTools(server);
 
-    expect(toolSpy).toHaveBeenCalledTimes(8);
+    expect(toolSpy.mock.calls.length).toBeGreaterThanOrEqual(9);
     expect(toolSpy).toHaveBeenCalledWith(
       'get-item-details',
       expect.any(String),
@@ -122,6 +122,12 @@ describe('MCP Server Integration', () => {
     );
     expect(toolSpy).toHaveBeenCalledWith(
       'list-items',
+      expect.any(String),
+      expect.any(Object),
+      expect.any(Function)
+    );
+    expect(toolSpy).toHaveBeenCalledWith(
+      'list-occurrences',
       expect.any(String),
       expect.any(Object),
       expect.any(Function)

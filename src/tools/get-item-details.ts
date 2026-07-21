@@ -15,7 +15,11 @@ export function registerGetItemDetailsTool(server: McpServer) {
     "get-item-details",
     "Get item details for a Rollbar item",
     {
-      counter: z.number().int().describe("Rollbar item counter"),
+      counter: z
+        .number()
+        .int()
+        .min(1)
+        .describe("Rollbar item counter (must be >= 1)"),
       max_tokens: z
         .number()
         .int()
