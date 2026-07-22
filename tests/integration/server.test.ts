@@ -5,6 +5,7 @@ import { registerAllTools } from '../../src/tools/index.js';
 
 // Mock the config to provide PROJECTS and resolveProject
 vi.mock('../../src/config.js', () => ({
+  HAS_ACCOUNT_TOKEN: false,
   PROJECTS: [
     {
       name: 'default',

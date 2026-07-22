@@ -1,8 +1,9 @@
 import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { resolveProject } from "../config.js";
+import { resolveAuthContext } from "../config.js";
 import { makeRollbarRequest } from "../utils/api.js";
 import { buildProjectParam } from "../utils/project-params.js";
+import { injectProjectIdQueryParam } from "../utils/params.js";
 import { RollbarApiResponse, RollbarVersionsResponse } from "../types/index.js";
 
 export function registerGetVersionTool(server: McpServer) {
@@ -18,8 +19,12 @@ export function registerGetVersionTool(server: McpServer) {
       project: buildProjectParam(),
     },
     async ({ version, environment, project }) => {
-      const { token, apiBase } = resolveProject(project);
-      const versionsUrl = `${apiBase}/versions/${version}?environment=${environment}`;
+      const auth = await resolveAuthContext(project);
+      const { token, apiBase } = auth;
+      const versionsUrl = injectProjectIdQueryParam(
+        `${apiBase}/versions/${version}?environment=${environment}`,
+        auth,
+      );
       const versionsResponse = await makeRollbarRequest<
         RollbarApiResponse<RollbarVersionsResponse>
       >(versionsUrl, "get-version", token);

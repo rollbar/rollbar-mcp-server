@@ -189,5 +189,70 @@ describe('api utilities', () => {
         }
       });
     });
+
+    describe('actionable 401/403 error hints', () => {
+      it('adds an invalid/expired token hint on 401', async () => {
+        fetchMock.mockResolvedValueOnce({
+          ok: false,
+          status: 401,
+          statusText: 'Unauthorized',
+          text: vi.fn().mockResolvedValueOnce('')
+        });
+
+        await expect(makeRollbarRequest(testUrl, 'get-deployments', 'test-token'))
+          .rejects.toThrow(/invalid or expired/);
+      });
+
+      it('adds an account-token-required hint on 403 against GET /projects', async () => {
+        fetchMock.mockResolvedValueOnce({
+          ok: false,
+          status: 403,
+          statusText: 'Forbidden',
+          text: vi.fn().mockResolvedValueOnce('')
+        });
+
+        await expect(
+          makeRollbarRequest('https://api.rollbar.com/api/1/projects', 'list-projects', 'test-token')
+        ).rejects.toThrow(/requires an account access token/);
+      });
+
+      it('adds an update-item-specific write-scope hint on 403 for update-item', async () => {
+        fetchMock.mockResolvedValueOnce({
+          ok: false,
+          status: 403,
+          statusText: 'Forbidden',
+          text: vi.fn().mockResolvedValueOnce('')
+        });
+
+        await expect(
+          makeRollbarRequest('https://api.rollbar.com/api/1/item/123', 'update-item', 'test-token')
+        ).rejects.toThrow(/write scope/);
+      });
+
+      it('adds a generic insufficient-privileges hint on 403 for other tools', async () => {
+        fetchMock.mockResolvedValueOnce({
+          ok: false,
+          status: 403,
+          statusText: 'Forbidden',
+          text: vi.fn().mockResolvedValueOnce('')
+        });
+
+        await expect(
+          makeRollbarRequest('https://api.rollbar.com/api/1/deploys', 'get-deployments', 'test-token')
+        ).rejects.toThrow(/sufficient privileges/);
+      });
+
+      it('does not add a hint for non-auth error statuses', async () => {
+        fetchMock.mockResolvedValueOnce({
+          ok: false,
+          status: 404,
+          statusText: 'Not Found',
+          text: vi.fn().mockResolvedValueOnce('')
+        });
+
+        await expect(makeRollbarRequest(testUrl, 'get-deployments', 'test-token'))
+          .rejects.toThrow('Rollbar API error: 404 Not Found');
+      });
+    });
   });
 });

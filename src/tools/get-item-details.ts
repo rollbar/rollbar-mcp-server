@@ -1,8 +1,9 @@
 import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { resolveProject } from "../config.js";
+import { resolveAuthContext } from "../config.js";
 import { makeRollbarRequest } from "../utils/api.js";
 import { buildProjectParam } from "../utils/project-params.js";
+import { injectProjectIdQueryParam } from "../utils/params.js";
 import {
   RollbarApiResponse,
   RollbarItemResponse,
@@ -27,8 +28,12 @@ export function registerGetItemDetailsTool(server: McpServer) {
       project: buildProjectParam(),
     },
     async ({ counter, max_tokens, project }) => {
-      const { token, apiBase } = resolveProject(project);
-      const counterUrl = `${apiBase}/item?counter=${counter}`;
+      const auth = await resolveAuthContext(project);
+      const { token, apiBase } = auth;
+      const counterUrl = injectProjectIdQueryParam(
+        `${apiBase}/item?counter=${counter}`,
+        auth,
+      );
       const itemResponse = await makeRollbarRequest<
         RollbarApiResponse<RollbarItemResponse>
       >(counterUrl, "get-item-details", token);
@@ -41,7 +46,10 @@ export function registerGetItemDetailsTool(server: McpServer) {
 
       const item = itemResponse.result;
 
-      const occurrenceUrl = `${apiBase}/instance/${item.last_occurrence_id}`;
+      const occurrenceUrl = injectProjectIdQueryParam(
+        `${apiBase}/instance/${item.last_occurrence_id}`,
+        auth,
+      );
       const occurrenceResponse = await makeRollbarRequest<
         RollbarApiResponse<RollbarOccurrenceResponse>
       >(occurrenceUrl, "get-item-details", token);

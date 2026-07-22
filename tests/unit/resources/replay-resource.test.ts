@@ -8,6 +8,7 @@ vi.mock('../../../src/utils/api.js', () => ({
 }));
 
 vi.mock('../../../src/config.js', () => ({
+  HAS_ACCOUNT_TOKEN: false,
   PROJECTS: [
     {
       name: 'default',
@@ -20,6 +21,12 @@ vi.mock('../../../src/config.js', () => ({
     token: 'test-token',
     apiBase: 'https://api.rollbar.com/api/1',
   })),
+  resolveAuthContext: vi.fn(async () => ({
+    token: 'test-token',
+    tokenType: 'project',
+    apiBase: 'https://api.rollbar.com/api/1',
+  })),
+  getAccountModeInfo: vi.fn(async () => ({ active: false })),
 }));
 
 let makeRollbarRequestMock: any;
@@ -152,11 +159,14 @@ describe('read replay resource handler', () => {
   it('throws when PROJECTS.length > 1 with message to use get-replay tool', async () => {
     vi.resetModules();
     vi.doMock('../../../src/config.js', () => ({
+      HAS_ACCOUNT_TOKEN: false,
       PROJECTS: [
         { name: 'backend', token: 't1', apiBase: 'https://api.rollbar.com/api/1' },
         { name: 'frontend', token: 't2', apiBase: 'https://api.rollbar.com/api/1' },
       ],
       resolveProject: vi.fn(),
+      resolveAuthContext: vi.fn(),
+      getAccountModeInfo: vi.fn(async () => ({ active: false })),
     }));
     const replayMod = await import('../../../src/resources/replay-resource.js');
     let multiProjectReadCallback: typeof readCallback;
@@ -175,5 +185,137 @@ describe('read replay resource handler', () => {
     await expect(
       multiProjectReadCallback!(uri, { environment, sessionId, replayId })
     ).rejects.toThrow('get-replay tool');
+  });
+
+  it('allows direct replay resource access in account mode even when PROJECTS.length > 1, and injects project_id', async () => {
+    vi.resetModules();
+    vi.doMock('../../../src/config.js', () => ({
+      HAS_ACCOUNT_TOKEN: false,
+      PROJECTS: [
+        { name: 'backend', token: 't1', apiBase: 'https://api.rollbar.com/api/1' },
+        { name: 'frontend', token: 't2', apiBase: 'https://api.rollbar.com/api/1' },
+      ],
+      resolveProject: vi.fn(),
+      resolveAuthContext: vi.fn(async () => ({
+        token: 'acct-token',
+        tokenType: 'account',
+        projectId: 9,
+        apiBase: 'https://api.rollbar.com/api/1',
+      })),
+      getAccountModeInfo: vi.fn(async () => ({
+        active: true,
+        token: 'acct-token',
+        apiBase: 'https://api.rollbar.com/api/1',
+      })),
+    }));
+
+    const { makeRollbarRequest } = await import('../../../src/utils/api.js');
+    const localMakeRollbarRequestMock = makeRollbarRequest as any;
+    localMakeRollbarRequestMock.mockResolvedValue({
+      err: 0,
+      result: mockSuccessfulReplayResponse.result,
+    });
+
+    const replayMod = await import('../../../src/resources/replay-resource.js');
+    let accountModeReadCallback: typeof readCallback;
+    const resourceSpy3 = vi.fn((_n: string, _t: unknown, _m: unknown, handler: unknown) => {
+      accountModeReadCallback = handler as typeof readCallback;
+    });
+    const server3 = { resource: resourceSpy3 } as any;
+    replayMod.registerReplayResource(server3);
+
+    const uri = new URL(replayUri);
+    await accountModeReadCallback!(uri, { environment, sessionId, replayId });
+
+    expect(localMakeRollbarRequestMock).toHaveBeenCalledWith(
+      `https://api.rollbar.com/api/1/environment/${environment}/session/${sessionId}/replay/${replayId}?project_id=9`,
+      'get-replay',
+      'acct-token'
+    );
+  });
+
+  it('propagates a clear error (does not silently proceed unresolved) when account mode has multiple projects and resolveAuthContext cannot pick one', async () => {
+    vi.resetModules();
+    vi.doMock('../../../src/config.js', () => ({
+      HAS_ACCOUNT_TOKEN: false,
+      PROJECTS: [],
+      resolveProject: vi.fn(),
+      // Mirrors what the real resolveAuthContext()/resolveProjectId() do when
+      // an account token has 2+ enabled projects and no `project` was given:
+      // they throw rather than resolving a projectId. The read-resource
+      // handler must let that propagate as an error, not fall through to an
+      // unscoped/broken account-mode request.
+      resolveAuthContext: vi.fn(async () => {
+        throw new Error(
+          'Multiple projects available on this account token. Specify a project. Available: backend, frontend'
+        );
+      }),
+      getAccountModeInfo: vi.fn(async () => ({
+        active: true,
+        token: 'acct-token',
+        apiBase: 'https://api.rollbar.com/api/1',
+      })),
+    }));
+
+    const { makeRollbarRequest } = await import('../../../src/utils/api.js');
+    const localMakeRollbarRequestMock = makeRollbarRequest as any;
+
+    const replayMod = await import('../../../src/resources/replay-resource.js');
+    let noProjectReadCallback: typeof readCallback;
+    const resourceSpy4 = vi.fn((_n: string, _t: unknown, _m: unknown, handler: unknown) => {
+      noProjectReadCallback = handler as typeof readCallback;
+    });
+    const server4 = { resource: resourceSpy4 } as any;
+    replayMod.registerReplayResource(server4);
+
+    const uri = new URL(replayUri);
+    await expect(
+      noProjectReadCallback!(uri, { environment, sessionId, replayId })
+    ).rejects.toThrow('Multiple projects available on this account token');
+
+    // The request must never have been made without a resolved project.
+    expect(localMakeRollbarRequestMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects direct resource access up front (before calling resolveAuthContext) when account mode has multiple enabled projects', async () => {
+    vi.resetModules();
+    // PROJECTS is empty (account-token-only mode). Before the fix, this
+    // guard checked `PROJECTS.length > 1 && !accountMode.active`, which is
+    // always false here regardless of enabledProjectCount, so the guard
+    // never fired and execution fell through to resolveAuthContext(undefined)
+    // instead of failing with this resource's own clear error message.
+    const resolveAuthContextMock = vi.fn();
+    vi.doMock('../../../src/config.js', () => ({
+      HAS_ACCOUNT_TOKEN: true,
+      PROJECTS: [],
+      resolveAuthContext: resolveAuthContextMock,
+      getAccountModeInfo: vi.fn(async () => ({
+        active: true,
+        token: 'acct-token',
+        apiBase: 'https://api.rollbar.com/api/1',
+        enabledProjectCount: 2,
+      })),
+    }));
+
+    const { makeRollbarRequest } = await import('../../../src/utils/api.js');
+    const localMakeRollbarRequestMock = makeRollbarRequest as any;
+
+    const replayMod = await import('../../../src/resources/replay-resource.js');
+    let guardReadCallback: typeof readCallback;
+    const resourceSpy5 = vi.fn((_n: string, _t: unknown, _m: unknown, handler: unknown) => {
+      guardReadCallback = handler as typeof readCallback;
+    });
+    const server5 = { resource: resourceSpy5 } as any;
+    replayMod.registerReplayResource(server5);
+
+    const uri = new URL(replayUri);
+    await expect(
+      guardReadCallback!(uri, { environment, sessionId, replayId })
+    ).rejects.toThrow(
+      'Direct replay resource access is not supported when multiple projects are configured'
+    );
+
+    expect(resolveAuthContextMock).not.toHaveBeenCalled();
+    expect(localMakeRollbarRequestMock).not.toHaveBeenCalled();
   });
 });
