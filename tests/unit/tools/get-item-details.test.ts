@@ -86,7 +86,7 @@ describe('get-item-details tool', () => {
     const result = await toolHandler({ counter: 42, project: undefined });
 
     expect(makeRollbarRequestMock).toHaveBeenCalledWith(
-      'https://api.rollbar.com/api/1/item_by_counter/42',
+      'https://api.rollbar.com/api/1/item?counter=42',
       'get-item-details',
       'test-token'
     );
@@ -305,7 +305,7 @@ describe('get-item-details tool', () => {
     const result = await toolHandler({ counter: 42, project: 'default' });
 
     expect(makeRollbarRequestMock).toHaveBeenCalledWith(
-      'https://api.rollbar.com/api/1/item_by_counter/42',
+      'https://api.rollbar.com/api/1/item?counter=42',
       'get-item-details',
       'test-token'
     );
