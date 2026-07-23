@@ -1,8 +1,9 @@
 import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { resolveProject } from "../config.js";
+import { resolveAuthContext } from "../config.js";
 import { makeRollbarRequest } from "../utils/api.js";
 import { buildProjectParam } from "../utils/project-params.js";
+import { injectProjectIdsRepeatedQueryParam } from "../utils/params.js";
 import {
   RollbarApiResponse,
   RollbarListItemsResponse,
@@ -71,7 +72,8 @@ export function registerListItemsTool(server: McpServer) {
       query?: string;
       project?: string;
     }) => {
-      const { token, apiBase } = resolveProject(project);
+      const auth = await resolveAuthContext(project);
+      const { token, apiBase } = auth;
       // Build query parameters
       const params = new URLSearchParams();
 
@@ -99,7 +101,10 @@ export function registerListItemsTool(server: McpServer) {
         params.append("query", query);
       }
 
-      const listUrl = `${apiBase}/items/?${params.toString()}`;
+      const listUrl = injectProjectIdsRepeatedQueryParam(
+        `${apiBase}/items/?${params.toString()}`,
+        auth,
+      );
 
       const listResponse = await makeRollbarRequest<
         RollbarApiResponse<RollbarListItemsResponse>

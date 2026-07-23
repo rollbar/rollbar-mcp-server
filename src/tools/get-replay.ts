@@ -3,7 +3,7 @@ import path from "node:path";
 import { tmpdir } from "node:os";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { PROJECTS, resolveProject } from "../config.js";
+import { PROJECTS, getAccountModeInfo, resolveAuthContext } from "../config.js";
 import { buildProjectParam } from "../utils/project-params.js";
 import {
   buildReplayResourceUri,
@@ -74,12 +74,23 @@ export function registerGetReplayTool(server: McpServer) {
     },
     async ({ environment, sessionId, replayId, delivery, project }) => {
       const deliveryMode = delivery ?? "file";
-      const { token, apiBase } = resolveProject(project);
+      const auth = await resolveAuthContext(project);
+      const { token, apiBase } = auth;
 
-      if (deliveryMode === "resource" && PROJECTS.length > 1) {
-        throw new Error(
-          'delivery="resource" is not supported when multiple projects are configured. Use delivery="file" and specify the project parameter instead.',
-        );
+      if (deliveryMode === "resource") {
+        const accountMode = await getAccountModeInfo();
+        // In a hybrid config (account token + explicit project tokens), each
+        // explicit project entry is an additional addressable project beyond
+        // whatever the account token itself can reach, so it must count
+        // toward the single-project check too.
+        const tooManyProjects = accountMode.active
+          ? (accountMode.enabledProjectCount ?? 0) + PROJECTS.length > 1
+          : PROJECTS.length > 1;
+        if (tooManyProjects) {
+          throw new Error(
+            'delivery="resource" is not supported when multiple projects are configured. Use delivery="file" and specify the project parameter instead.',
+          );
+        }
       }
 
       const replayData = await fetchReplayData(
@@ -88,6 +99,7 @@ export function registerGetReplayTool(server: McpServer) {
         replayId,
         token,
         apiBase,
+        auth,
       );
 
       const resourceUri = buildReplayResourceUri(
