@@ -61,11 +61,21 @@ async function getOrFetch(
 
   if (forceRefresh || !entry) {
     const fetchPromise = fetchProjects(token, apiBase);
-    entry = { projects: entry?.projects ?? [], fetchPromise };
+    const previousProjects = entry?.projects ?? [];
+    entry = { projects: previousProjects, fetchPromise };
     cache.set(key, entry);
-    const projects = await fetchPromise;
-    cache.set(key, { projects });
-    return projects;
+    try {
+      const projects = await fetchPromise;
+      cache.set(key, { projects });
+      return projects;
+    } catch (error) {
+      // Fetch failed: drop the rejected promise from the cache so the next
+      // call retries against the API instead of replaying this same
+      // rejection forever, while preserving any previously successful
+      // project list for the caller to fall back on.
+      cache.set(key, { projects: previousProjects });
+      throw error;
+    }
   }
 
   if (entry.fetchPromise) {

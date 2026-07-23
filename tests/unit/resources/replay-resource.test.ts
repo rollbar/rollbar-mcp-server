@@ -187,14 +187,53 @@ describe('read replay resource handler', () => {
     ).rejects.toThrow('get-replay tool');
   });
 
-  it('allows direct replay resource access in account mode even when PROJECTS.length > 1, and injects project_id', async () => {
+  it('rejects direct replay resource access in a hybrid config (account token + explicit project tokens) when the combined addressable project count exceeds one', async () => {
     vi.resetModules();
+    // Hybrid config: an account token that alone resolves to a single
+    // enabled project, plus two explicit project-token entries. Before the
+    // fix, the guard only counted accountMode.enabledProjectCount (1) and
+    // ignored PROJECTS entirely, so `1 > 1` was false and this incorrectly
+    // fell through to resolveAuthContext(undefined) -- which, per its own
+    // precedence rules, has no way to know which of the 3 addressable
+    // projects the request meant. The guard must count PROJECTS.length
+    // toward the total so this case is rejected up front instead.
     vi.doMock('../../../src/config.js', () => ({
-      HAS_ACCOUNT_TOKEN: false,
+      HAS_ACCOUNT_TOKEN: true,
       PROJECTS: [
         { name: 'backend', token: 't1', apiBase: 'https://api.rollbar.com/api/1' },
         { name: 'frontend', token: 't2', apiBase: 'https://api.rollbar.com/api/1' },
       ],
+      resolveProject: vi.fn(),
+      resolveAuthContext: vi.fn(),
+      getAccountModeInfo: vi.fn(async () => ({
+        active: true,
+        token: 'acct-token',
+        apiBase: 'https://api.rollbar.com/api/1',
+        enabledProjectCount: 1,
+      })),
+    }));
+
+    const replayMod = await import('../../../src/resources/replay-resource.js');
+    let hybridReadCallback: typeof readCallback;
+    const resourceSpy3 = vi.fn((_n: string, _t: unknown, _m: unknown, handler: unknown) => {
+      hybridReadCallback = handler as typeof readCallback;
+    });
+    const server3 = { resource: resourceSpy3 } as any;
+    replayMod.registerReplayResource(server3);
+
+    const uri = new URL(replayUri);
+    await expect(
+      hybridReadCallback!(uri, { environment, sessionId, replayId })
+    ).rejects.toThrow(
+      'Direct replay resource access is not supported when multiple projects are configured'
+    );
+  });
+
+  it('allows direct replay resource access in pure account mode with exactly one enabled project and no explicit project tokens, and injects project_id', async () => {
+    vi.resetModules();
+    vi.doMock('../../../src/config.js', () => ({
+      HAS_ACCOUNT_TOKEN: true,
+      PROJECTS: [],
       resolveProject: vi.fn(),
       resolveAuthContext: vi.fn(async () => ({
         token: 'acct-token',
@@ -206,6 +245,7 @@ describe('read replay resource handler', () => {
         active: true,
         token: 'acct-token',
         apiBase: 'https://api.rollbar.com/api/1',
+        enabledProjectCount: 1,
       })),
     }));
 
@@ -218,11 +258,11 @@ describe('read replay resource handler', () => {
 
     const replayMod = await import('../../../src/resources/replay-resource.js');
     let accountModeReadCallback: typeof readCallback;
-    const resourceSpy3 = vi.fn((_n: string, _t: unknown, _m: unknown, handler: unknown) => {
+    const resourceSpyAccountOnly = vi.fn((_n: string, _t: unknown, _m: unknown, handler: unknown) => {
       accountModeReadCallback = handler as typeof readCallback;
     });
-    const server3 = { resource: resourceSpy3 } as any;
-    replayMod.registerReplayResource(server3);
+    const serverAccountOnly = { resource: resourceSpyAccountOnly } as any;
+    replayMod.registerReplayResource(serverAccountOnly);
 
     const uri = new URL(replayUri);
     await accountModeReadCallback!(uri, { environment, sessionId, replayId });

@@ -110,8 +110,12 @@ const readReplayResource: ReadResourceTemplateCallback = async (
   variables,
 ) => {
   const accountMode = await getAccountModeInfo();
+  // In a hybrid config (account token + explicit project tokens), each
+  // explicit project entry is an additional addressable project beyond
+  // whatever the account token itself can reach, so it must count toward
+  // the single-project check too.
   const tooManyProjects = accountMode.active
-    ? (accountMode.enabledProjectCount ?? 0) > 1
+    ? (accountMode.enabledProjectCount ?? 0) + PROJECTS.length > 1
     : PROJECTS.length > 1;
   if (tooManyProjects) {
     throw new Error(

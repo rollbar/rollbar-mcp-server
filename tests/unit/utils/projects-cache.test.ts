@@ -178,6 +178,27 @@ describe("projects-cache", () => {
     await expect(getProjects(token, apiBase)).rejects.toThrow(/boom/);
   });
 
+  it("retries against the API instead of replaying a stale rejection after a failed fetch", async () => {
+    fetchMock
+      .mockRejectedValueOnce(new Error("network error"))
+      .mockResolvedValueOnce(jsonResponse({ err: 0, result: allProjects }));
+
+    await expect(getProjects(token, apiBase)).rejects.toThrow(
+      /network error/,
+    );
+
+    // Before the fix, the rejected fetchPromise stayed cached forever, so
+    // this lookup miss (name not found in the empty post-failure cache)
+    // would retry against that same dead rejected promise instead of
+    // hitting the API again -- account-token mode would stay broken until
+    // process restart even though the underlying issue (e.g. a transient
+    // network blip) had already cleared up.
+    const id = await resolveProjectId(token, apiBase, "Backend");
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(id).toBe(1);
+  });
+
   it("retries once when the initial cache is empty and finds a single project after refresh", async () => {
     fetchMock
       .mockResolvedValueOnce(jsonResponse({ err: 0, result: [] }))
