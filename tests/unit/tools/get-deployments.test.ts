@@ -8,6 +8,7 @@ vi.mock('../../../src/utils/api.js', () => ({
 }));
 
 vi.mock('../../../src/config.js', () => ({
+  HAS_ACCOUNT_TOKEN: false,
   PROJECTS: [
     {
       name: 'default',
@@ -18,6 +19,11 @@ vi.mock('../../../src/config.js', () => ({
   resolveProject: vi.fn(() => ({
     name: 'default',
     token: 'test-token',
+    apiBase: 'https://api.rollbar.com/api/1',
+  })),
+  resolveAuthContext: vi.fn(async () => ({
+    token: 'test-token',
+    tokenType: 'project',
     apiBase: 'https://api.rollbar.com/api/1',
   })),
   getUserAgent: (toolName: string) => `rollbar-mcp-server/test (tool: ${toolName})`,
@@ -153,5 +159,24 @@ describe('get-deployments tool', () => {
     await toolHandler({ limit: 10 });
 
     expect(console.error).not.toHaveBeenCalled();
+  });
+
+  it('should inject project_id as a query param in account mode', async () => {
+    const { resolveAuthContext } = await import('../../../src/config.js');
+    (resolveAuthContext as any).mockResolvedValueOnce({
+      token: 'acct-token',
+      tokenType: 'account',
+      projectId: 55,
+      apiBase: 'https://api.rollbar.com/api/1',
+    });
+    makeRollbarRequestMock.mockResolvedValueOnce(mockSuccessfulDeployResponse);
+
+    await toolHandler({ limit: 10, project: 'SomeProject' });
+
+    expect(makeRollbarRequestMock).toHaveBeenCalledWith(
+      'https://api.rollbar.com/api/1/deploys?limit=10&project_id=55',
+      'get-deployments',
+      'acct-token'
+    );
   });
 });

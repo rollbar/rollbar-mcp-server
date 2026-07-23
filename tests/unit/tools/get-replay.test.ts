@@ -18,6 +18,7 @@ vi.mock('node:fs/promises', () => ({
 }));
 
 vi.mock('../../../src/config.js', () => ({
+  HAS_ACCOUNT_TOKEN: false,
   PROJECTS: [
     {
       name: 'default',
@@ -30,6 +31,12 @@ vi.mock('../../../src/config.js', () => ({
     token: 'test-token',
     apiBase: 'https://api.rollbar.com/api/1',
   })),
+  resolveAuthContext: vi.fn(async () => ({
+    token: 'test-token',
+    tokenType: 'project',
+    apiBase: 'https://api.rollbar.com/api/1',
+  })),
+  getAccountModeInfo: vi.fn(async () => ({ active: false })),
   getUserAgent: (toolName: string) => `rollbar-mcp-server/test (tool: ${toolName})`,
 }));
 
@@ -215,9 +222,34 @@ describe('get-replay tool', () => {
     );
   });
 
+  it('should inject project_id as a query param on the replay path in account mode', async () => {
+    const { resolveAuthContext } = await import('../../../src/config.js');
+    (resolveAuthContext as any).mockResolvedValueOnce({
+      token: 'acct-token',
+      tokenType: 'account',
+      projectId: 66,
+      apiBase: 'https://api.rollbar.com/api/1',
+    });
+    makeRollbarRequestMock.mockResolvedValueOnce(mockSuccessfulReplayResponse);
+
+    await toolHandler({
+      environment: 'production',
+      sessionId: 'session-123',
+      replayId: 'replay-456',
+      project: 'SomeProject',
+    });
+
+    expect(makeRollbarRequestMock).toHaveBeenCalledWith(
+      'https://api.rollbar.com/api/1/environment/production/session/session-123/replay/replay-456?project_id=66',
+      'get-replay',
+      'acct-token'
+    );
+  });
+
   it('should reject delivery=resource when multiple projects are configured', async () => {
     vi.resetModules();
     vi.doMock('../../../src/config.js', () => ({
+      HAS_ACCOUNT_TOKEN: false,
       PROJECTS: [
         { name: 'backend', token: 'token-1', apiBase: 'https://api.rollbar.com/api/1' },
         { name: 'frontend', token: 'token-2', apiBase: 'https://api.rollbar.com/api/1' },
@@ -227,6 +259,12 @@ describe('get-replay tool', () => {
         token: 'token-1',
         apiBase: 'https://api.rollbar.com/api/1',
       })),
+      resolveAuthContext: vi.fn(async () => ({
+        token: 'token-1',
+        tokenType: 'project',
+        apiBase: 'https://api.rollbar.com/api/1',
+      })),
+      getAccountModeInfo: vi.fn(async () => ({ active: false })),
       getUserAgent: (toolName: string) => `rollbar-mcp-server/test (tool: ${toolName})`,
     }));
 
@@ -257,9 +295,102 @@ describe('get-replay tool', () => {
     );
   });
 
+  it('should reject delivery=resource in account-token-only mode when the account has multiple enabled projects', async () => {
+    vi.resetModules();
+    // PROJECTS is empty here — this is account-token-only mode. Before the
+    // fix, the guard checked PROJECTS.length > 1, which is always false in
+    // this mode regardless of how many real projects the account has, so
+    // this rejection never fired and a resource link that could never be
+    // read was returned instead.
+    vi.doMock('../../../src/config.js', () => ({
+      HAS_ACCOUNT_TOKEN: true,
+      PROJECTS: [],
+      resolveAuthContext: vi.fn(async () => ({
+        token: 'acct-token',
+        tokenType: 'account',
+        projectId: 1,
+        apiBase: 'https://api.rollbar.com/api/1',
+      })),
+      getAccountModeInfo: vi.fn(async () => ({
+        active: true,
+        token: 'acct-token',
+        apiBase: 'https://api.rollbar.com/api/1',
+        enabledProjectCount: 2,
+      })),
+      getUserAgent: (toolName: string) => `rollbar-mcp-server/test (tool: ${toolName})`,
+    }));
+
+    const { registerGetReplayTool: register } = await import('../../../src/tools/get-replay.js');
+    let localToolHandler: any;
+    const localServer = {
+      tool: vi.fn((_name, _description, _schema, handler) => {
+        localToolHandler = handler;
+      }),
+    } as any;
+
+    register(localServer);
+
+    await expect(
+      localToolHandler({
+        environment: 'production',
+        sessionId: 'session-123',
+        replayId: 'replay-456',
+        project: 'SomeAccountProject',
+        delivery: 'resource',
+      })
+    ).rejects.toThrow(
+      'delivery="resource" is not supported when multiple projects are configured'
+    );
+  });
+
+  it('should allow delivery=resource in account-token mode when the account has exactly one enabled project', async () => {
+    vi.resetModules();
+    vi.doMock('../../../src/config.js', () => ({
+      HAS_ACCOUNT_TOKEN: true,
+      PROJECTS: [],
+      resolveAuthContext: vi.fn(async () => ({
+        token: 'acct-token',
+        tokenType: 'account',
+        projectId: 42,
+        apiBase: 'https://api.rollbar.com/api/1',
+      })),
+      getAccountModeInfo: vi.fn(async () => ({
+        active: true,
+        token: 'acct-token',
+        apiBase: 'https://api.rollbar.com/api/1',
+        enabledProjectCount: 1,
+      })),
+      getUserAgent: (toolName: string) => `rollbar-mcp-server/test (tool: ${toolName})`,
+    }));
+
+    const { makeRollbarRequest } = await import('../../../src/utils/api.js');
+    const localMakeRollbarRequestMock = makeRollbarRequest as any;
+    localMakeRollbarRequestMock.mockResolvedValueOnce(mockSuccessfulReplayResponse);
+
+    const { registerGetReplayTool: register } = await import('../../../src/tools/get-replay.js');
+    let localToolHandler: any;
+    const localServer = {
+      tool: vi.fn((_name, _description, _schema, handler) => {
+        localToolHandler = handler;
+      }),
+    } as any;
+
+    register(localServer);
+
+    const result = await localToolHandler({
+      environment: 'production',
+      sessionId: 'session-123',
+      replayId: 'replay-456',
+      delivery: 'resource',
+    });
+
+    expect(result.content[1].type).toBe('resource_link');
+  });
+
   it('should still allow delivery=file when multiple projects are configured', async () => {
     vi.resetModules();
     vi.doMock('../../../src/config.js', () => ({
+      HAS_ACCOUNT_TOKEN: false,
       PROJECTS: [
         { name: 'backend', token: 'token-1', apiBase: 'https://api.rollbar.com/api/1' },
         { name: 'frontend', token: 'token-2', apiBase: 'https://api.rollbar.com/api/1' },
@@ -269,6 +400,12 @@ describe('get-replay tool', () => {
         token: 'token-1',
         apiBase: 'https://api.rollbar.com/api/1',
       })),
+      resolveAuthContext: vi.fn(async () => ({
+        token: 'token-1',
+        tokenType: 'project',
+        apiBase: 'https://api.rollbar.com/api/1',
+      })),
+      getAccountModeInfo: vi.fn(async () => ({ active: false })),
       getUserAgent: (toolName: string) => `rollbar-mcp-server/test (tool: ${toolName})`,
     }));
 
