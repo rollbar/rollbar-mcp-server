@@ -290,7 +290,7 @@ describe("config", () => {
     await import("../../src/config.js");
 
     expect(console.error).toHaveBeenCalledWith(
-      expect.stringContaining("expected either a single-project config"),
+      expect.stringContaining("expected an account-only config"),
     );
     expect(process.exit).toHaveBeenCalledWith(1);
   });
