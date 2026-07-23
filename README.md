@@ -6,14 +6,44 @@ A Model Context Protocol (MCP) server for [Rollbar](https://rollbar.com).
 
 This MCP server implements the `stdio` server type, which means your AI tool (e.g. Claude, Cursor) will run it directly; you don't run a separate process or connect over http.
 
-### Configuration
+## Configuration
 
-**Single Project: Environment variable (single project, backward compatible)**
+### Account access token
+
+Configure a single Rollbar Account Access Token and let every tool work across all projects in that account:
+
+- `ROLLBAR_ACCOUNT_ACCESS_TOKEN` (env var), or
+- `accountToken` (a top-level key in `.rollbar-mcp.json`, alongside `projects`/`token`/`apiBase`)
+
+To create one: in Rollbar, go to your **account settings → Account Access Tokens**, create a new named, enabled token, and choose **read** (or **read and write**, if you plan to use `update-item`) scope. Copy the full generated secret right away, Rollbar only shows it once, and store it securely (a secrets manager or your shell's env config, not committed to source control).
+
+```json
+{
+  "accountToken": "acct_tok_abc123"
+}
+```
+
+If you want tighter controls on some projects, give the account token read scope so you can read every project, then explicitly list the few projects that need `update-item` with their own read+write project tokens. Those override the account token for that project only, per the precedence rule below (explicit project token always wins).
+
+```json
+{
+  "accountToken": "acct_tok_abc123",
+  "projects": [
+    { "name": "backend", "token": "tok_backend_readwrite" }
+  ]
+}
+```
+
+Project-token configs are completely unchanged by this feature: if you don't set an account token, nothing about existing single- or multi-project setups behaves any differently. The two modes can also coexist: if a `project` name matches an explicitly configured project that has its own token, that project's own token is always used for that project, even when an account token is also present.
+
+### Per-project configuration for more secure access
+
+**Single Project: Environment variable**
 
 - `ROLLBAR_ACCESS_TOKEN`: access token for your Rollbar project.
 - `ROLLBAR_API_BASE` (optional): override the API base URL (defaults to `https://api.rollbar.com/api/1`).
 
-**Multiple Project: Config file (single or multiple projects)**
+**Multiple Project: Config file**
 
 Create `.rollbar-mcp.json` in your working directory or home directory, or set `ROLLBAR_CONFIG_FILE` to point to a custom path. A checked-in template is available at `rollbar-mcp-example.json`; copy it to `.rollbar-mcp.json` and fill in your real tokens.
 
@@ -43,40 +73,10 @@ Config file lookup order:
 
 If a config file exists but is invalid, the server exits with an error instead of falling back to a lower-priority config source.
 
-**Account access token (one token for every project)**
-
-Instead of maintaining and rotating a token per project, you can configure a single Rollbar **account** access token and let every tool work across all projects in that account:
-
-- `ROLLBAR_ACCOUNT_ACCESS_TOKEN` (env var), or
-- `accountToken` (a top-level key in `.rollbar-mcp.json`, alongside `projects`/`token`/`apiBase`)
-
-To create one: in Rollbar, go to your **account settings → Account Access Tokens**, create a new named, enabled token, and choose **read** (or **read and write**, if you plan to use `update-item`) scope. Copy the full generated secret right away — Rollbar only shows it once — and store it securely (a secrets manager or your shell's env config, not committed to source control).
-
-```json
-{
-  "accountToken": "acct_tok_abc123"
-}
-```
-
-or combined with explicit per-project tokens:
-
-```json
-{
-  "accountToken": "acct_tok_abc123",
-  "projects": [
-    { "name": "backend", "token": "tok_backend_readwrite" }
-  ]
-}
-```
-
-With an account token configured, every tool's `project` parameter accepts a real Rollbar project **name** (case-insensitive) or numeric **id**, resolved live against `GET /projects`. If the account has exactly one enabled project, it's used automatically when `project` is omitted; if there are multiple, you must specify one. `list-projects()` returns the real projects on the account (id, name, status) instead of the local config echo.
-
-Project-token configs are **completely unchanged** by this feature — if you don't set an account token, nothing about existing single- or multi-project setups behaves any differently. The two modes can also coexist: if a `project` name matches an explicitly configured project that has its own token, that project's own token is always used for that project, even when an account token is also present.
-
 Required scopes:
 
 - Read-only tools (`get-item-details`, `get-deployments`, `get-version`, `get-top-items`, `list-items`, `get-replay`, `list-projects`) work with a **read**-scope account token.
-- `update-item` requires an account token with **both read and write** scope — every account-token call resolves the target project via `GET /projects` first (read), then makes the `PATCH` request (write). A write-only token will fail at the project-resolution step before ever reaching the update.
+- `update-item` requires an account token with **both read and write** scope: every account-token call resolves the target project via `GET /projects` first (read), then makes the `PATCH` request (write). A write-only token will fail at the project-resolution step before ever reaching the update.
 - As with project tokens, prefer a read-scope token unless you specifically need `update-item`.
 
 If the server detects only `ROLLBAR_ACCESS_TOKEN` is set (no explicit account token), it makes a one-time, cached check against `GET /projects` to see whether that token is actually an account token; if so, account mode activates automatically. A single project-scoped token continues to work exactly as before.
@@ -100,8 +100,6 @@ If the server detects only `ROLLBAR_ACCESS_TOKEN` is set (no explicit account to
 `update-item(itemId, status?, level?, title?, assignedUserId?, resolvedInVersion?, snoozed?, teamId?, project?)`: Update an item's properties including status, level, title, assignment, and more. Optional `project` when multiple projects are configured or in account-token mode. Example prompt: `Mark Rollbar item #123456 as resolved` or `Assign item #123456 to user ID 789`. Requires a project token with `write` scope, or an account token with both `read` and `write` scope.
 
 ## How to Use
-
-Tested with node 20 and 22 (`nvm use 22`).
 
 ### Claude Code
 
@@ -261,4 +259,4 @@ Configure your `.vscode/mcp.json` as follows (env var or `ROLLBAR_CONFIG_FILE` f
 }
 ```
 
-Or using a local development installation—see CONTRIBUTING.md.
+Or using a local development installation, see CONTRIBUTING.md.
