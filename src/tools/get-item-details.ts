@@ -28,8 +28,7 @@ export function registerGetItemDetailsTool(server: McpServer) {
     },
     async ({ counter, max_tokens, project }) => {
       const { token, apiBase } = resolveProject(project);
-      // Redirects are followed, so we get an item response from the counter request
-      const counterUrl = `${apiBase}/item_by_counter/${counter}`;
+      const counterUrl = `${apiBase}/item?counter=${counter}`;
       const itemResponse = await makeRollbarRequest<
         RollbarApiResponse<RollbarItemResponse>
       >(counterUrl, "get-item-details", token);
