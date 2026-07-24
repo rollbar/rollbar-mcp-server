@@ -171,13 +171,25 @@ describe("list-occurrences tool", () => {
     await toolHandler({ counter: 42, limit: 3, page: 1, last_id: 998 });
 
     expect(makeRollbarRequestMock).toHaveBeenCalledWith(
-      "https://api.rollbar.com/api/1/item/1/instances?limit=3&last_id=998",
+      "https://api.rollbar.com/api/1/item/1/instances?limit=3&last_id=998&lastId=998",
       "list-occurrences",
       "test-token",
     );
   });
 
-  it("should only send last_id when both page and last_id are provided", async () => {
+  it("should send both last_id and lastId (camelCase) so cursor pagination works regardless of which name Rollbar's backend reads", async () => {
+    makeRollbarRequestMock
+      .mockResolvedValueOnce(mockSuccessfulItemResponse)
+      .mockResolvedValueOnce(mockSuccessfulListOccurrencesResponse);
+
+    await toolHandler({ counter: 42, limit: 3, page: 1, last_id: 998 });
+
+    const instancesCall = makeRollbarRequestMock.mock.calls[1][0];
+    expect(instancesCall).toContain("last_id=998");
+    expect(instancesCall).toContain("lastId=998");
+  });
+
+  it("should only send cursor params when both page and last_id are provided", async () => {
     makeRollbarRequestMock
       .mockResolvedValueOnce(mockSuccessfulItemResponse)
       .mockResolvedValueOnce(mockSuccessfulListOccurrencesResponse);
@@ -186,6 +198,7 @@ describe("list-occurrences tool", () => {
 
     const instancesCall = makeRollbarRequestMock.mock.calls[1][0];
     expect(instancesCall).toContain("last_id=998");
+    expect(instancesCall).toContain("lastId=998");
     expect(instancesCall).not.toContain("page=");
   });
 

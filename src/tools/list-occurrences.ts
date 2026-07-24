@@ -139,7 +139,13 @@ export function registerListOccurrencesTool(server: McpServer) {
       const params = new URLSearchParams();
       params.append("limit", limit.toString());
       if (last_id !== undefined) {
+        // Rollbar's public OAS contract documents this cursor param as
+        // `lastId`, while the current route handler also accepts `last_id`
+        // (and a code comment there suggests `lastId` is the one being
+        // phased out). Send both so cursor pagination keeps working
+        // regardless of which name the backend ends up preferring.
         params.append("last_id", last_id.toString());
+        params.append("lastId", last_id.toString());
       } else {
         params.append("page", page.toString());
       }
