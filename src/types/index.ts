@@ -19,6 +19,12 @@ export interface RollbarItemResponse {
   language: string;
   platform: string;
   hash: string;
+  // group_status distinguishes a native item (1) from an aggregate/group
+  // item (2) — see mox/model/constants.py GROUP_STATUS and
+  // mox/responses/internalapi/items.py:item_for_id, which serializes this
+  // field on both GET /item/?counter= and GET /item/{id}.
+  group_status?: number;
+  group_item_id?: number;
   exception?: any;
   request?: any;
   body?: any;
@@ -155,5 +161,11 @@ export interface RollbarListItemsResponse {
   page: number;
   total_count: number;
   items: RollbarListItemResponse[];
+  [key: string]: any; // Allow for any other properties
+}
+
+export interface RollbarListOccurrencesResponse {
+  page: number;
+  instances: RollbarOccurrenceResponse[];
   [key: string]: any; // Allow for any other properties
 }
