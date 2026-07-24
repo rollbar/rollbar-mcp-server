@@ -8,6 +8,7 @@ vi.mock('../../../src/utils/api.js', () => ({
 }));
 
 vi.mock('../../../src/config.js', () => ({
+  HAS_ACCOUNT_TOKEN: false,
   PROJECTS: [
     {
       name: 'default',
@@ -18,6 +19,11 @@ vi.mock('../../../src/config.js', () => ({
   resolveProject: vi.fn(() => ({
     name: 'default',
     token: 'test-token',
+    apiBase: 'https://api.rollbar.com/api/1',
+  })),
+  resolveAuthContext: vi.fn(async () => ({
+    token: 'test-token',
+    tokenType: 'project',
     apiBase: 'https://api.rollbar.com/api/1',
   })),
   getUserAgent: (toolName: string) => `rollbar-mcp-server/test (tool: ${toolName})`,
@@ -237,5 +243,28 @@ describe('list-items tool', () => {
     expect(urlCall).toContain('level=error');
     expect(urlCall).toContain('level=warning');
     expect(urlCall).toContain('level=critical');
+  });
+
+  it('should inject a REPEATED project_ids query param in account mode (never singular project_id, never comma-joined)', async () => {
+    const { resolveAuthContext } = await import('../../../src/config.js');
+    (resolveAuthContext as any).mockResolvedValueOnce({
+      token: 'acct-token',
+      tokenType: 'account',
+      projectId: 33,
+      apiBase: 'https://api.rollbar.com/api/1',
+    });
+    makeRollbarRequestMock.mockResolvedValueOnce(mockSuccessfulListItemsResponse);
+
+    await toolHandler({ status: 'active', environment: 'production', project: 'SomeProject' });
+
+    expect(makeRollbarRequestMock).toHaveBeenCalledWith(
+      'https://api.rollbar.com/api/1/items/?status=active&environment=production&project_ids=33',
+      'list-items',
+      'acct-token'
+    );
+
+    const urlCall = makeRollbarRequestMock.mock.calls[0][0];
+    expect(urlCall).not.toMatch(/[?&]project_id=/);
+    expect(urlCall).not.toContain(',');
   });
 });

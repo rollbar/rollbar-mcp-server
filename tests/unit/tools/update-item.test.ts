@@ -8,6 +8,7 @@ vi.mock('../../../src/utils/api.js', () => ({
 }));
 
 vi.mock('../../../src/config.js', () => ({
+  HAS_ACCOUNT_TOKEN: false,
   PROJECTS: [
     {
       name: 'default',
@@ -18,6 +19,11 @@ vi.mock('../../../src/config.js', () => ({
   resolveProject: vi.fn(() => ({
     name: 'default',
     token: 'test-token',
+    apiBase: 'https://api.rollbar.com/api/1',
+  })),
+  resolveAuthContext: vi.fn(async () => ({
+    token: 'test-token',
+    tokenType: 'project',
     apiBase: 'https://api.rollbar.com/api/1',
   })),
   getUserAgent: (toolName: string) => `rollbar-mcp-server/test (tool: ${toolName})`,
@@ -301,6 +307,40 @@ describe('update-item tool', () => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ snoozed: false })
+      }
+    );
+  });
+
+  it('should merge project_id into the JSON body in account mode (PATCH /item/{id})', async () => {
+    const { resolveAuthContext } = await import('../../../src/config.js');
+    (resolveAuthContext as any).mockResolvedValueOnce({
+      token: 'acct-token',
+      tokenType: 'account',
+      projectId: 44,
+      apiBase: 'https://api.rollbar.com/api/1',
+    });
+    const mockResponse = {
+      err: 0,
+      result: { id: 123, status: 'resolved' }
+    };
+    makeRollbarRequestMock.mockResolvedValueOnce(mockResponse);
+
+    await toolHandler({
+      itemId: 123,
+      status: 'resolved',
+      project: 'SomeProject',
+    });
+
+    expect(makeRollbarRequestMock).toHaveBeenCalledWith(
+      'https://api.rollbar.com/api/1/item/123',
+      'update-item',
+      'acct-token',
+      {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ status: 'resolved', project_id: 44 })
       }
     );
   });

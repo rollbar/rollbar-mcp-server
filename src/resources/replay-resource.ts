@@ -3,8 +3,14 @@ import type {
   McpServer,
   ReadResourceTemplateCallback,
 } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { PROJECTS, resolveProject } from "../config.js";
+import {
+  PROJECTS,
+  AuthContext,
+  getAccountModeInfo,
+  resolveAuthContext,
+} from "../config.js";
 import { makeRollbarRequest } from "../utils/api.js";
+import { injectProjectIdQueryParam } from "../utils/params.js";
 import { RollbarApiResponse } from "../types/index.js";
 
 const REPLAY_URI_TEMPLATE =
@@ -79,13 +85,10 @@ export async function fetchReplayData(
   replayId: string,
   token: string,
   apiBase: string,
+  auth?: AuthContext,
 ): Promise<unknown> {
-  const replayUrl = buildReplayApiUrl(
-    apiBase,
-    environment,
-    sessionId,
-    replayId,
-  );
+  const rawUrl = buildReplayApiUrl(apiBase, environment, sessionId, replayId);
+  const replayUrl = auth ? injectProjectIdQueryParam(rawUrl, auth) : rawUrl;
 
   const replayResponse = await makeRollbarRequest<RollbarApiResponse<unknown>>(
     replayUrl,
@@ -106,13 +109,22 @@ const readReplayResource: ReadResourceTemplateCallback = async (
   uri,
   variables,
 ) => {
-  if (PROJECTS.length > 1) {
+  const accountMode = await getAccountModeInfo();
+  // In a hybrid config (account token + explicit project tokens), each
+  // explicit project entry is an additional addressable project beyond
+  // whatever the account token itself can reach, so it must count toward
+  // the single-project check too.
+  const tooManyProjects = accountMode.active
+    ? (accountMode.enabledProjectCount ?? 0) + PROJECTS.length > 1
+    : PROJECTS.length > 1;
+  if (tooManyProjects) {
     throw new Error(
       "Direct replay resource access is not supported when multiple projects are configured. " +
         "Use the get-replay tool with a project parameter instead.",
     );
   }
-  const { token, apiBase } = resolveProject(undefined);
+  const auth = await resolveAuthContext(undefined);
+  const { token, apiBase } = auth;
 
   const environmentValue = normalizeTemplateVariable(variables.environment);
   const sessionValue = normalizeTemplateVariable(variables.sessionId);
@@ -134,7 +146,14 @@ const readReplayResource: ReadResourceTemplateCallback = async (
   const replayData =
     cached !== undefined
       ? cached
-      : await fetchReplayData(environment, sessionId, replayId, token, apiBase);
+      : await fetchReplayData(
+          environment,
+          sessionId,
+          replayId,
+          token,
+          apiBase,
+          auth,
+        );
 
   if (cached === undefined) {
     cacheReplayData(resourceUri, replayData);

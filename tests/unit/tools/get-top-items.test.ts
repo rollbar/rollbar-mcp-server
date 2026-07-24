@@ -8,6 +8,7 @@ vi.mock('../../../src/utils/api.js', () => ({
 }));
 
 vi.mock('../../../src/config.js', () => ({
+  HAS_ACCOUNT_TOKEN: false,
   PROJECTS: [
     {
       name: 'default',
@@ -18,6 +19,11 @@ vi.mock('../../../src/config.js', () => ({
   resolveProject: vi.fn(() => ({
     name: 'default',
     token: 'test-token',
+    apiBase: 'https://api.rollbar.com/api/1',
+  })),
+  resolveAuthContext: vi.fn(async () => ({
+    token: 'test-token',
+    tokenType: 'project',
     apiBase: 'https://api.rollbar.com/api/1',
   })),
   getUserAgent: (toolName: string) => `rollbar-mcp-server/test (tool: ${toolName})`,
@@ -161,6 +167,25 @@ describe('get-top-items tool', () => {
       'https://api.rollbar.com/api/1/reports/top_active_items?hours=24&environments=production&sort=occurrences',
       'get-top-items',
       'test-token'
+    );
+  });
+
+  it('should inject project_id as a query param in account mode', async () => {
+    const { resolveAuthContext } = await import('../../../src/config.js');
+    (resolveAuthContext as any).mockResolvedValueOnce({
+      token: 'acct-token',
+      tokenType: 'account',
+      projectId: 88,
+      apiBase: 'https://api.rollbar.com/api/1',
+    });
+    makeRollbarRequestMock.mockResolvedValueOnce(mockSuccessfulTopItemsResponse);
+
+    await toolHandler({ environment: 'production', project: 'SomeProject' });
+
+    expect(makeRollbarRequestMock).toHaveBeenCalledWith(
+      'https://api.rollbar.com/api/1/reports/top_active_items?hours=24&environments=production&sort=occurrences&project_id=88',
+      'get-top-items',
+      'acct-token'
     );
   });
 });

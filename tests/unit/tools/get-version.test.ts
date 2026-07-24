@@ -8,6 +8,7 @@ vi.mock('../../../src/utils/api.js', () => ({
 }));
 
 vi.mock('../../../src/config.js', () => ({
+  HAS_ACCOUNT_TOKEN: false,
   PROJECTS: [
     {
       name: 'default',
@@ -18,6 +19,11 @@ vi.mock('../../../src/config.js', () => ({
   resolveProject: vi.fn(() => ({
     name: 'default',
     token: 'test-token',
+    apiBase: 'https://api.rollbar.com/api/1',
+  })),
+  resolveAuthContext: vi.fn(async () => ({
+    token: 'test-token',
+    tokenType: 'project',
     apiBase: 'https://api.rollbar.com/api/1',
   })),
   getUserAgent: (toolName: string) => `rollbar-mcp-server/test (tool: ${toolName})`,
@@ -177,6 +183,25 @@ describe('get-version tool', () => {
       'https://api.rollbar.com/api/1/versions/v1?environment=production',
       'get-version',
       'test-token'
+    );
+  });
+
+  it('should inject project_id as a query param in account mode', async () => {
+    const { resolveAuthContext } = await import('../../../src/config.js');
+    (resolveAuthContext as any).mockResolvedValueOnce({
+      token: 'acct-token',
+      tokenType: 'account',
+      projectId: 21,
+      apiBase: 'https://api.rollbar.com/api/1',
+    });
+    makeRollbarRequestMock.mockResolvedValueOnce(mockSuccessfulVersionResponse);
+
+    await toolHandler({ version: 'v1', environment: 'production', project: 'SomeProject' });
+
+    expect(makeRollbarRequestMock).toHaveBeenCalledWith(
+      'https://api.rollbar.com/api/1/versions/v1?environment=production&project_id=21',
+      'get-version',
+      'acct-token'
     );
   });
 });

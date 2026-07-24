@@ -1,8 +1,9 @@
 import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { resolveProject } from "../config.js";
+import { resolveAuthContext } from "../config.js";
 import { makeRollbarRequest } from "../utils/api.js";
 import { buildProjectParam } from "../utils/project-params.js";
+import { injectProjectIdBodyParam } from "../utils/params.js";
 import { RollbarApiResponse } from "../types/index.js";
 
 export function registerUpdateItemTool(server: McpServer) {
@@ -53,7 +54,8 @@ export function registerUpdateItemTool(server: McpServer) {
       teamId,
       project,
     }) => {
-      const { token, apiBase } = resolveProject(project);
+      const auth = await resolveAuthContext(project);
+      const { token, apiBase } = auth;
       const updateData: Record<string, unknown> = {};
 
       if (status !== undefined) updateData.status = status;
@@ -71,6 +73,7 @@ export function registerUpdateItemTool(server: McpServer) {
       }
 
       const url = `${apiBase}/item/${itemId}`;
+      const body = injectProjectIdBodyParam(updateData, auth);
       const response = await makeRollbarRequest<RollbarApiResponse<unknown>>(
         url,
         "update-item",
@@ -80,7 +83,7 @@ export function registerUpdateItemTool(server: McpServer) {
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify(updateData),
+          body: JSON.stringify(body),
         },
       );
 

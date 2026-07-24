@@ -8,6 +8,7 @@ vi.mock('../../../src/utils/api.js', () => ({
 }));
 
 vi.mock('../../../src/config.js', () => ({
+  HAS_ACCOUNT_TOKEN: false,
   PROJECTS: [
     {
       name: 'default',
@@ -18,6 +19,11 @@ vi.mock('../../../src/config.js', () => ({
   resolveProject: vi.fn(() => ({
     name: 'default',
     token: 'test-token',
+    apiBase: 'https://api.rollbar.com/api/1',
+  })),
+  resolveAuthContext: vi.fn(async () => ({
+    token: 'test-token',
+    tokenType: 'project',
     apiBase: 'https://api.rollbar.com/api/1',
   })),
   getUserAgent: (toolName: string) => `rollbar-mcp-server/test (tool: ${toolName})`,
@@ -86,7 +92,7 @@ describe('get-item-details tool', () => {
     const result = await toolHandler({ counter: 42, project: undefined });
 
     expect(makeRollbarRequestMock).toHaveBeenCalledWith(
-      'https://api.rollbar.com/api/1/item_by_counter/42',
+      'https://api.rollbar.com/api/1/item?counter=42',
       'get-item-details',
       'test-token'
     );
@@ -305,12 +311,53 @@ describe('get-item-details tool', () => {
     const result = await toolHandler({ counter: 42, project: 'default' });
 
     expect(makeRollbarRequestMock).toHaveBeenCalledWith(
-      'https://api.rollbar.com/api/1/item_by_counter/42',
+      'https://api.rollbar.com/api/1/item?counter=42',
       'get-item-details',
       'test-token'
     );
     const responseData = JSON.parse(result.content[0].text);
     expect(responseData).toHaveProperty('counter', 42);
+  });
+
+  it('should inject project_id as a query param when resolveAuthContext returns account mode', async () => {
+    const { resolveAuthContext } = await import('../../../src/config.js');
+    (resolveAuthContext as any).mockResolvedValueOnce({
+      token: 'acct-token',
+      tokenType: 'account',
+      projectId: 77,
+      apiBase: 'https://api.rollbar.com/api/1',
+    });
+
+    makeRollbarRequestMock
+      .mockResolvedValueOnce(mockSuccessfulItemResponse)
+      .mockResolvedValueOnce(mockSuccessfulOccurrenceResponse);
+
+    await toolHandler({ counter: 42, project: 'SomeProject' });
+
+    expect(makeRollbarRequestMock).toHaveBeenCalledWith(
+      'https://api.rollbar.com/api/1/item?counter=42&project_id=77',
+      'get-item-details',
+      'acct-token'
+    );
+    expect(makeRollbarRequestMock).toHaveBeenCalledWith(
+      'https://api.rollbar.com/api/1/instance/999?project_id=77',
+      'get-item-details',
+      'acct-token'
+    );
+  });
+
+  it('should NOT inject project_id when resolveAuthContext returns project mode (unchanged behavior)', async () => {
+    makeRollbarRequestMock
+      .mockResolvedValueOnce(mockSuccessfulItemResponse)
+      .mockResolvedValueOnce(mockSuccessfulOccurrenceResponse);
+
+    await toolHandler({ counter: 42 });
+
+    expect(makeRollbarRequestMock).toHaveBeenCalledWith(
+      'https://api.rollbar.com/api/1/item?counter=42',
+      'get-item-details',
+      'test-token'
+    );
   });
 
   it('should validate max_tokens parameter with Zod schema', () => {
