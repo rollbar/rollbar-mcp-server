@@ -75,7 +75,7 @@ If a config file exists but is invalid, the server exits with an error instead o
 
 Required scopes:
 
-- Read-only tools (`get-item-details`, `get-deployments`, `get-version`, `get-top-items`, `list-items`, `get-replay`, `list-projects`) work with a **read**-scope account token.
+- Read-only tools (`get-item-details`, `get-deployments`, `get-version`, `get-top-items`, `list-items`, `get-replay`, `list-projects`, `list-occurrences`) work with a **read**-scope account token.
 - `update-item` requires an account token with **both read and write** scope: every account-token call resolves the target project via `GET /projects` first (read), then makes the `PATCH` request (write). A write-only token will fail at the project-resolution step before ever reaching the update.
 - As with project tokens, prefer a read-scope token unless you specifically need `update-item`.
 
@@ -83,21 +83,39 @@ If the server detects only `ROLLBAR_ACCESS_TOKEN` is set (no explicit account to
 
 ### Tools
 
-`list-projects()`: List available Rollbar projects. In project-token mode, lists the locally configured projects (names and apiBase only; tokens are never returned). In account-token mode, lists the real projects on the account (id, name, status) fetched live from Rollbar.
+`list-projects()`: See which Rollbar projects this server can talk to. If you're using a single project token, this just confirms the one project you've configured. If you're using an account token that can reach multiple projects, this is how you find the project name or id to pass into the other tools' `project` parameter.
 
-`get-item-details(counter, max_tokens?, project?)`: Given an item number, fetch the item details and last occurrence details. Supports an optional `max_tokens` parameter (default: 20000) to automatically truncate large occurrence responses. Optional `project` selects which project to use (by configured name, or by real project name/id in account-token mode). Example prompt: `Diagnose the root cause of Rollbar item #123456`
+`get-item-details(counter, max_tokens?, project?)`: Get the full picture on a single Rollbar item: its details plus its most recent occurrence, so you don't have to look up the item and then separately fetch the latest error. Give it the item's counter (the number you see in the Rollbar UI).
 
-`get-deployments(limit, project?)`: List deploy data for the given project. Optional `project` when multiple projects are configured or in account-token mode. Example prompt: `List the last 5 deployments` or `Are there any failed deployments?`
+`max_tokens` (default 20000) caps how large the occurrence data in the response can get. Some occurrences carry a lot of detail (long stack traces, request data), so this keeps a single item lookup from ballooning the response. Optional `project` selects which project to use, by configured name or by real project name/id in account-token mode. Example prompt: `Diagnose the root cause of Rollbar item #123456`
 
-`get-version(version, environment, project?)`: Fetch version details for the given version string and environment. Optional `project` when multiple projects are configured or in account-token mode.
+`get-deployments(limit, project?)`: List recent deploys for a project, so you can line up when a deploy went out against when errors started or stopped happening. Optional `project` when multiple projects are configured or in account-token mode. Example prompt: `List the last 5 deployments` or `Are there any failed deployments?`
 
-`get-top-items(environment, project?)`: Fetch the top items in the last 24 hours for the given environment. Optional `project` when multiple projects are configured or in account-token mode.
+`get-version(version, environment, project?)`: Look up how a specific version (like a git SHA) has performed in an environment, including when it first and last showed up in occurrences. Useful for checking whether a particular release introduced or fixed an issue. Optional `project` when multiple projects are configured or in account-token mode.
 
-`list-items(status?, level?, environment?, page?, limit?, query?, project?)`: List items filtered by status, environment, and search query. Optional `project` when multiple projects are configured or in account-token mode.
+`get-top-items(environment, project?)`: See what's actually breaking right now. Returns the items with the most occurrences in the last 24 hours for the given environment, so you can triage what to look at first instead of scanning the full item list. Optional `project` when multiple projects are configured or in account-token mode.
 
-`get-replay(environment, sessionId, replayId, delivery?, project?)`: Retrieve session replay metadata and payload for a specific session. By default the tool writes the replay JSON to a temporary file (under your system temp directory) and returns the path. Set `delivery="resource"` to receive a `rollbar://replay/<environment>/<sessionId>/<replayId>` link for MCP-aware clients. Optional `project` when multiple projects are configured or in account-token mode. `delivery="resource"` is only supported when the server addresses a single project (single-project-token mode, or account-token mode with exactly one project); otherwise use `delivery="file"` with a `project` parameter instead. Example prompt: `Fetch the replay 789 from session abc in staging`.
+`list-items(status?, level?, environment?, page?, limit?, query?, project?)`: Search and filter Rollbar items instead of pulling the whole list. Filter by `status` (default `active`, so resolved and muted items stay out of your way), `level`, and `environment`, or search by `query` text. Use `page` and `limit` to control how much comes back at once. Optional `project` when multiple projects are configured or in account-token mode.
 
-`update-item(itemId, status?, level?, title?, assignedUserId?, resolvedInVersion?, snoozed?, teamId?, project?)`: Update an item's properties including status, level, title, assignment, and more. Optional `project` when multiple projects are configured or in account-token mode. Example prompt: `Mark Rollbar item #123456 as resolved` or `Assign item #123456 to user ID 789`. Requires a project token with `write` scope, or an account token with both `read` and `write` scope.
+`list-occurrences(counter, limit?, page?, last_id?, max_tokens?, project?)`: Look up the actual occurrences behind a Rollbar item, not just the item summary. Give it the item's counter and it returns the individual instances, each with its own timestamp, environment, and error detail.
+
+Use `limit` to control how many occurrences come back (default 3, max 100), and `page` or `last_id` to move through more of them. `last_id` is cursor-based pagination: pass the `id` of the last occurrence you got back, and you'll get the next batch after it. We added this because plain page numbers can skip or repeat results if occurrences shift around between calls, and `last_id` doesn't have that problem, so use it when you're paging through a lot of occurrences. If you pass both, `last_id` wins. Occurrences within a page are always ordered by timestamp (newest first), so the last one you see is reliably the right one to hand back as `last_id`.
+
+Occurrence data can get big fast, especially for errors with large stack traces or request payloads. `max_tokens` (default 20000, minimum 100) caps roughly how large the whole response can get, in about `max_tokens * 4` characters. We built this because without a cap, a handful of occurrences could blow way past what fits in a conversation. Every occurrence you asked for still shows up in the response, though. Instead of dropping any of them to stay under budget, the tool shrinks the biggest ones down step by step, keeping the most useful fields (level, environment, exception message, and similar) for as long as it can before falling back to just an id and timestamp. A top-level `_truncation` field tells you when this happened. If your `limit` and `max_tokens` genuinely can't fit even a minimal version of every occurrence, you'll get a clear error telling you to lower `limit` or raise `max_tokens`, instead of a silently incomplete page.
+
+Some Rollbar items are actually groups of several items bundled together. Rollbar's public API can't correctly list occurrences for these yet, so calling this tool on a group item returns an explicit `group_item_not_supported` message saying so, instead of quietly showing you an empty list that looks like the item has no occurrences at all.
+
+Optional `project` when multiple projects are configured. Example prompt: `Show me the last 3 occurrences of item #24265`
+
+`get-replay(environment, sessionId, replayId, delivery?, project?)`: Fetch a session replay's metadata and payload for a specific session, so you can see what a user actually did leading up to an error.
+
+By default (`delivery="file"`), the replay JSON is written to a temp file on disk and the tool returns the file path. This works everywhere, but the file sticks around until you clean it up yourself. Set `delivery="resource"` instead to get back a `rollbar://` link that MCP-aware clients can read directly, with no file left behind, but this only works when the server only ever talks to a single project (either single-project-token mode, or account-token mode with exactly one project). If you're set up for multiple projects, stick with `delivery="file"` and pass `project` explicitly.
+
+Optional `project` when multiple projects are configured or in account-token mode. Example prompt: `Fetch the replay 789 from session abc in staging`.
+
+`update-item(itemId, status?, level?, title?, assignedUserId?, resolvedInVersion?, snoozed?, teamId?, project?)`: Change an item's status, level, title, assignee, resolved version, snooze state, or owning team, so you can act on an item directly instead of switching to the Rollbar UI.
+
+This needs write access: a project token with `write` scope, or an account token with both `read` and `write` scope. A read-only token will fail here even though it works fine for every other tool. Optional `project` when multiple projects are configured or in account-token mode. Example prompt: `Mark Rollbar item #123456 as resolved` or `Assign item #123456 to user ID 789`.
 
 ## How to Use
 
