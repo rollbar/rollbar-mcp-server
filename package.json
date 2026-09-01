@@ -45,23 +45,23 @@
     "js-yaml": "^4.3.0"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.26.0",
-    "dotenv": "^17.2.1",
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "dotenv": "^17.4.2",
     "rollbar": "^3.0.0-alpha.6",
-    "undici": "^7.25.0",
+    "undici": "^7.29.0",
     "zod": "^3.25.76"
   },
   "devDependencies": {
-    "@eslint/js": "^9.25.1",
+    "@eslint/js": "^9.39.5",
     "@modelcontextprotocol/inspector": "0.16.6",
-    "@types/node": "^24.1.0",
-    "@vitest/coverage-v8": "^4.1.1",
-    "eslint": "^9.25.1",
+    "@types/node": "^24.13.3",
+    "@vitest/coverage-v8": "^4.1.11",
+    "eslint": "^9.39.5",
     "eslint-config-prettier": "^10.1.2",
-    "eslint-plugin-prettier": "^5.2.6",
-    "prettier": "^3.5.3",
+    "eslint-plugin-prettier": "^5.5.6",
+    "prettier": "^3.9.6",
     "typescript": "^5.8.3",
-    "typescript-eslint": "^8.31.0",
-    "vitest": "^4.1.1"
+    "typescript-eslint": "^8.68.0",
+    "vitest": "^4.1.11"
   }
 }

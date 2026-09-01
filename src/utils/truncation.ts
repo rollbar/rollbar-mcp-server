@@ -15,7 +15,7 @@ interface TruncationModule {
   ) => StringifyResult;
 }
 
-const typedTruncation = truncation as TruncationModule;
+const typedTruncation: TruncationModule = truncation;
 
 const CHARS_PER_TOKEN = 4; // Rough estimate: 1 token = 4 characters
 
@@ -81,8 +81,7 @@ function getExceptionInfo(
   // depending on payload shape. Check both without retaining anything else
   // from data.body (frames, request/response bodies, custom blobs).
   const topLevel = data.exception as
-    | { class?: string; message?: string }
-    | undefined;
+    { class?: string; message?: string } | undefined;
   if (topLevel && (topLevel.class || topLevel.message)) {
     return { class: topLevel.class, message: topLevel.message };
   }
@@ -91,19 +90,16 @@ function getExceptionInfo(
   if (body) {
     const trace = body.trace as Record<string, unknown> | undefined;
     const traceException = trace?.exception as
-      | { class?: string; message?: string }
-      | undefined;
+      { class?: string; message?: string } | undefined;
     if (traceException && (traceException.class || traceException.message)) {
       return { class: traceException.class, message: traceException.message };
     }
     const traceChain = body.trace_chain as
-      | Array<Record<string, unknown>>
-      | undefined;
+      Array<Record<string, unknown>> | undefined;
     if (Array.isArray(traceChain) && traceChain.length > 0) {
       const first = traceChain[0];
       const chainException = first?.exception as
-        | { class?: string; message?: string }
-        | undefined;
+        { class?: string; message?: string } | undefined;
       if (chainException && (chainException.class || chainException.message)) {
         return {
           class: chainException.class,
