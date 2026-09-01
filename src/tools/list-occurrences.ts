@@ -4,9 +4,9 @@ import { resolveAuthContext } from "../config.js";
 import { makeRollbarRequest } from "../utils/api.js";
 import { buildProjectParam } from "../utils/project-params.js";
 import { injectProjectIdQueryParam } from "../utils/params.js";
+import { getItemByCounter } from "../utils/item.js";
 import {
   RollbarApiResponse,
-  RollbarItemResponse,
   RollbarListOccurrencesResponse,
   RollbarOccurrenceResponse,
 } from "../types/index.js";
@@ -74,31 +74,7 @@ export function registerListOccurrencesTool(server: McpServer) {
     async ({ counter, limit, page, last_id, max_tokens, project }) => {
       const auth = await resolveAuthContext(project);
       const { token, apiBase } = auth;
-
-      const itemParams = new URLSearchParams();
-      itemParams.append("counter", counter.toString());
-      const itemUrl = injectProjectIdQueryParam(
-        `${apiBase}/item/?${itemParams.toString()}`,
-        auth,
-      );
-      const itemResponse = await makeRollbarRequest<
-        RollbarApiResponse<RollbarItemResponse>
-      >(itemUrl, "list-occurrences", token);
-
-      if (!itemResponse || typeof itemResponse !== "object") {
-        throw new Error(`Invalid API response from ${itemUrl}: missing item`);
-      }
-
-      if (itemResponse.err !== 0) {
-        const errorMessage =
-          itemResponse.message || `Unknown error (code: ${itemResponse.err})`;
-        throw new Error(`Rollbar API returned error: ${errorMessage}`);
-      }
-
-      const item = itemResponse.result;
-      if (!item || typeof item.id !== "number") {
-        throw new Error(`Invalid API response from ${itemUrl}: missing item`);
-      }
+      const item = await getItemByCounter(counter, auth, "list-occurrences");
 
       // Mox's public GET /item/{id}/instances filters item_occurrence by
       // item_occurrence.item_id = this item's id. For a GROUP item, real

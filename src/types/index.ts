@@ -169,3 +169,26 @@ export interface RollbarListOccurrencesResponse {
   instances: RollbarOccurrenceResponse[];
   [key: string]: any; // Allow for any other properties
 }
+
+export interface RollbarItemCommentResponse {
+  id: number;
+  type: "comment" | "resolve_note";
+  item_id: number;
+  user_id: number;
+  username: string;
+  timestamp: number;
+  // Nullable: the backend serializes text from stored comment data, and a
+  // comment record without a text key returns "text": null.
+  text: string | null;
+  // Not emitted by the endpoint yet; ships with API-authored comments
+  // (mox #13781), which tags comments created via POST with via_api.
+  via_api?: boolean;
+  [key: string]: unknown;
+}
+
+export interface RollbarListItemCommentsResponse {
+  comments: RollbarItemCommentResponse[];
+  page: number;
+  total_count: number;
+  [key: string]: unknown;
+}

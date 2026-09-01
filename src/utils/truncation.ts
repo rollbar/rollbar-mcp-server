@@ -17,7 +17,7 @@ interface TruncationModule {
 
 const typedTruncation: TruncationModule = truncation;
 
-const CHARS_PER_TOKEN = 4; // Rough estimate: 1 token = 4 characters
+export const CHARS_PER_TOKEN = 4; // Rough estimate: 1 token = 4 characters
 
 /**
  * Truncates an occurrence to fit within token limit

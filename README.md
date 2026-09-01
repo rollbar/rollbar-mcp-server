@@ -75,7 +75,7 @@ If a config file exists but is invalid, the server exits with an error instead o
 
 Required scopes:
 
-- Read-only tools (`get-item-details`, `get-deployments`, `get-version`, `get-top-items`, `list-items`, `get-replay`, `list-projects`, `list-occurrences`) work with a **read**-scope account token.
+- Read-only tools (`get-item-details`, `get-deployments`, `get-version`, `get-top-items`, `list-items`, `get-replay`, `list-projects`, `list-occurrences`, `list-item-comments`) work with a **read**-scope account token.
 - `update-item` requires an account token with **both read and write** scope: every account-token call resolves the target project via `GET /projects` first (read), then makes the `PATCH` request (write). A write-only token will fail at the project-resolution step before ever reaching the update.
 - As with project tokens, prefer a read-scope token unless you specifically need `update-item`.
 
@@ -106,6 +106,8 @@ Occurrence data can get big fast, especially for errors with large stack traces 
 Some Rollbar items are actually groups of several items bundled together. Rollbar's public API can't correctly list occurrences for these yet, so calling this tool on a group item returns an explicit `group_item_not_supported` message saying so, instead of quietly showing you an empty list that looks like the item has no occurrences at all.
 
 Optional `project` when multiple projects are configured. Example prompt: `Show me the last 3 occurrences of item #24265`
+
+`list-item-comments(counter?, item_id?, page?, limit?, type?, max_tokens?, project?)`: List the human-authored comments and resolve notes on an item. Provide exactly one of the item's counter or numeric item id. Results use page-based pagination (`page` defaults to 1; `limit` defaults to 20 and has a maximum of 5000). Set `type` to `comment` or `resolve_note` to filter the results, or omit it to return both. `max_tokens` (default 20000) bounds the response size: comments are returned whole and in chronological order, and when a page exceeds the budget the trailing comments are dropped and a `_truncation` field reports how many were returned. Optional `project` when multiple projects are configured or in account-token mode. Example prompt: `Show me the comments on Rollbar item #24265`.
 
 `get-replay(environment, sessionId, replayId, delivery?, project?)`: Fetch a session replay's metadata and payload for a specific session, so you can see what a user actually did leading up to an error.
 

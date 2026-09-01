@@ -92,7 +92,7 @@ describe('get-item-details tool', () => {
     const result = await toolHandler({ counter: 42, project: undefined });
 
     expect(makeRollbarRequestMock).toHaveBeenCalledWith(
-      'https://api.rollbar.com/api/1/item?counter=42',
+      'https://api.rollbar.com/api/1/item/?counter=42',
       'get-item-details',
       'test-token'
     );
@@ -311,7 +311,7 @@ describe('get-item-details tool', () => {
     const result = await toolHandler({ counter: 42, project: 'default' });
 
     expect(makeRollbarRequestMock).toHaveBeenCalledWith(
-      'https://api.rollbar.com/api/1/item?counter=42',
+      'https://api.rollbar.com/api/1/item/?counter=42',
       'get-item-details',
       'test-token'
     );
@@ -335,7 +335,7 @@ describe('get-item-details tool', () => {
     await toolHandler({ counter: 42, project: 'SomeProject' });
 
     expect(makeRollbarRequestMock).toHaveBeenCalledWith(
-      'https://api.rollbar.com/api/1/item?counter=42&project_id=77',
+      'https://api.rollbar.com/api/1/item/?counter=42&project_id=77',
       'get-item-details',
       'acct-token'
     );
@@ -354,7 +354,7 @@ describe('get-item-details tool', () => {
     await toolHandler({ counter: 42 });
 
     expect(makeRollbarRequestMock).toHaveBeenCalledWith(
-      'https://api.rollbar.com/api/1/item?counter=42',
+      'https://api.rollbar.com/api/1/item/?counter=42',
       'get-item-details',
       'test-token'
     );

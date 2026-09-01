@@ -207,20 +207,20 @@ describe("list-occurrences tool", () => {
     ).rejects.toThrow("Rollbar API returned error: Invalid access token");
   });
 
-  it("should throw a missing item error for a null item response", async () => {
+  it("should throw a non-object response error for a null item response", async () => {
     makeRollbarRequestMock.mockResolvedValueOnce(null);
 
     await expect(
       toolHandler({ counter: 42, limit: 3, page: 1 }),
-    ).rejects.toThrow("missing item");
+    ).rejects.toThrow("non-object response");
   });
 
-  it("should throw a missing item error for malformed item result", async () => {
+  it("should throw a missing item id error for malformed item result", async () => {
     makeRollbarRequestMock.mockResolvedValueOnce({ err: 0, result: {} });
 
     await expect(
       toolHandler({ counter: 42, limit: 3, page: 1 }),
-    ).rejects.toThrow("missing item");
+    ).rejects.toThrow("missing item id");
   });
 
   it("should throw a missing instances error for a null instances response", async () => {
