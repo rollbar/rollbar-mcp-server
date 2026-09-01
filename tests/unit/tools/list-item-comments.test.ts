@@ -260,7 +260,7 @@ describe("list-item-comments tool", () => {
       expect(parsed._truncation).toBeUndefined();
     });
 
-    it("drops trailing comments and reports truncation when over budget", async () => {
+    it("keeps every comment and elides the longest texts when over budget", async () => {
       const comments = [
         makeComment(1, 1800),
         makeComment(2, 1800),
@@ -271,8 +271,8 @@ describe("list-item-comments tool", () => {
         result: { comments, page: 1, total_count: 3 },
       });
 
-      // max_tokens=1000 => 4000-char budget; each comment is ~1900 chars,
-      // so only the first fits once envelope overhead is reserved.
+      // max_tokens=1000 => 4000-char budget; three ~1900-char comments do
+      // not fit, so the largest texts are elided until the page does.
       const result = await toolHandler({
         item_id: 123,
         page: 1,
@@ -283,17 +283,23 @@ describe("list-item-comments tool", () => {
       const text = result.content[0].text;
       expect(text.length).toBeLessThanOrEqual(4000);
       const parsed = JSON.parse(text);
-      expect(parsed.comments).toHaveLength(1);
-      expect(parsed.comments[0].id).toBe(1);
+      expect(parsed.comments).toHaveLength(3);
+      expect(parsed.comments.map((c: any) => c.id)).toEqual([1, 2, 3]);
       expect(parsed.total_count).toBe(3);
-      expect(parsed._truncation).toEqual({
-        returned_comments: 1,
-        comments_on_page: 3,
-        note: expect.stringContaining("max_tokens"),
-      });
+      expect(parsed._truncation.comments_on_page).toBe(3);
+      expect(parsed._truncation.comments_with_truncated_text).toBeGreaterThan(
+        0,
+      );
+      const elided = parsed.comments.filter((c: any) => c.text_truncated);
+      expect(elided).toHaveLength(
+        parsed._truncation.comments_with_truncated_text,
+      );
+      for (const comment of elided) {
+        expect(comment.text).toHaveLength(200);
+      }
     });
 
-    it("returns zero comments with a truncation note when even one comment exceeds the budget", async () => {
+    it("elides a single oversized comment instead of dropping it", async () => {
       makeRollbarRequestMock.mockResolvedValueOnce({
         err: 0,
         result: { comments: [makeComment(1, 5000)], page: 1, total_count: 1 },
@@ -307,9 +313,25 @@ describe("list-item-comments tool", () => {
       });
 
       const parsed = JSON.parse(result.content[0].text);
-      expect(parsed.comments).toHaveLength(0);
-      expect(parsed._truncation.returned_comments).toBe(0);
+      expect(parsed.comments).toHaveLength(1);
+      expect(parsed.comments[0].text).toHaveLength(200);
+      expect(parsed.comments[0].text_truncated).toBe(true);
+      expect(parsed._truncation.comments_with_truncated_text).toBe(1);
       expect(parsed._truncation.comments_on_page).toBe(1);
+    });
+
+    it("fails with actionable guidance when even elided text cannot fit the page", async () => {
+      const comments = Array.from({ length: 60 }, (_, i) =>
+        makeComment(i + 1, 250),
+      );
+      makeRollbarRequestMock.mockResolvedValueOnce({
+        err: 0,
+        result: { comments, page: 1, total_count: 60 },
+      });
+
+      await expect(
+        toolHandler({ item_id: 123, page: 1, limit: 60, max_tokens: 1000 }),
+      ).rejects.toThrow("Lower limit or raise max_tokens");
     });
   });
 });

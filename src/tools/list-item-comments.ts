@@ -17,6 +17,28 @@ import { CHARS_PER_TOKEN } from "../utils/truncation.js";
 // note) when fitting comments into the max_tokens character budget.
 const ENVELOPE_OVERHEAD_CHARS = 300;
 
+// Text length kept when a comment's text has to be elided to fit the budget.
+const ELIDED_TEXT_CHARS = 200;
+
+// Every comment on the page is always returned (the API paginates by limit,
+// so dropping entries here would make them unreachable via page); over
+// budget, the longest texts are shortened instead and flagged.
+function elideCommentText(
+  comment: RollbarItemCommentResponse,
+): RollbarItemCommentResponse {
+  if (
+    typeof comment.text !== "string" ||
+    comment.text.length <= ELIDED_TEXT_CHARS
+  ) {
+    return comment;
+  }
+  return {
+    ...comment,
+    text: comment.text.slice(0, ELIDED_TEXT_CHARS),
+    text_truncated: true,
+  };
+}
+
 export function registerListItemCommentsTool(server: McpServer) {
   server.tool(
     "list-item-comments",
@@ -59,7 +81,7 @@ export function registerListItemCommentsTool(server: McpServer) {
         .min(1000)
         .default(20000)
         .describe(
-          "Target budget for the complete response, in tokens (default: 20000, minimum: 1000; approx. max_tokens*4 characters). Comments are kept whole and in chronological order; when the page does not fit, trailing comments are dropped and a top-level _truncation field reports how many of the page's comments were returned. Lower limit or raise max_tokens to adjust.",
+          "Target budget for the complete response, in tokens (default: 20000, minimum: 1000; approx. max_tokens*4 characters). Every comment on the page is always returned in chronological order; when the page does not fit, the longest comment texts are shortened (marked with text_truncated) and a top-level _truncation field reports how many were shortened. If even shortened text cannot fit the page, the call fails asking you to lower limit or raise max_tokens.",
         ),
       project: buildProjectParam(),
     },
@@ -97,29 +119,48 @@ export function registerListItemCommentsTool(server: McpServer) {
       }
 
       // Comments are small individually but limit allows up to 5000 per
-      // page, so bound the response like the sibling item tools do. Keep
-      // comments whole and in order; drop from the tail when over budget.
+      // page, so bound the response like the sibling item tools do. The API
+      // paginates by limit before this tool runs, so entries are never
+      // dropped (a dropped entry would be unreachable via page); the longest
+      // texts are elided instead, largest savings first.
       let text = JSON.stringify(result);
       const budgetChars = max_tokens * CHARS_PER_TOKEN;
       if (text.length > budgetChars) {
-        const kept: RollbarItemCommentResponse[] = [];
-        const commentBudget = budgetChars - ENVELOPE_OVERHEAD_CHARS;
-        let used = 0;
-        for (const comment of result.comments) {
-          const commentChars = JSON.stringify(comment).length + 1;
-          if (used + commentChars > commentBudget) {
+        const savingsByIndex = result.comments
+          .map((comment, index) => {
+            const fullChars = JSON.stringify(comment).length;
+            const elidedChars = JSON.stringify(
+              elideCommentText(comment),
+            ).length;
+            return { index, savings: fullChars - elidedChars };
+          })
+          .sort((a, b) => b.savings - a.savings);
+
+        const comments = [...result.comments];
+        let projectedChars = text.length + ENVELOPE_OVERHEAD_CHARS;
+        let elidedCount = 0;
+        for (const { index, savings } of savingsByIndex) {
+          if (projectedChars <= budgetChars || savings <= 0) {
             break;
           }
-          kept.push(comment);
-          used += commentChars;
+          comments[index] = elideCommentText(comments[index]);
+          projectedChars -= savings;
+          elidedCount += 1;
         }
+
+        if (projectedChars > budgetChars) {
+          throw new Error(
+            `The requested page of ${result.comments.length} comments does not fit within max_tokens=${max_tokens} even with comment text elided. Lower limit or raise max_tokens.`,
+          );
+        }
+
         text = JSON.stringify({
           ...result,
-          comments: kept,
+          comments,
           _truncation: {
-            returned_comments: kept.length,
             comments_on_page: result.comments.length,
-            note: "Trailing comments on this page were dropped to fit within max_tokens. Raise max_tokens or lower limit to retrieve more; comments are chronological, so use page to continue.",
+            comments_with_truncated_text: elidedCount,
+            note: "Every comment on this page is present and in order, but the longest comment texts were shortened to fit within max_tokens (marked with text_truncated). Raise max_tokens, or lower limit and re-request, to see full text.",
           },
         });
       }
