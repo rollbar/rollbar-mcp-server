@@ -258,7 +258,7 @@ With a config file (single or multiple projects):
 
 Restart Cursor (or reload the window) after changing MCP settings. To use a local build instead of npx, see CONTRIBUTING.md.
 
-### VS Code
+### VS Code (including GitHub Copilot)
 
 Configure your `.vscode/mcp.json` as follows (env var or `ROLLBAR_CONFIG_FILE` for config file):
 
@@ -278,3 +278,47 @@ Configure your `.vscode/mcp.json` as follows (env var or `ROLLBAR_CONFIG_FILE` f
 ```
 
 Or using a local development installation, see CONTRIBUTING.md.
+
+This is the same file GitHub Copilot's agent mode reads in VS Code. Put it in `.vscode/mcp.json` to share the server with everyone on the repo, or in your user-profile `mcp.json` (**Command Palette → MCP: Open User Configuration**) to keep your token out of the repository. After saving, start the server with **MCP: List Servers → rollbar → Start**, then pick the tools via the 🛠️ icon in the Copilot Chat agent-mode toolbar.
+
+### GitHub Copilot CLI
+
+Add to `~/.copilot/mcp-config.json`. Note that Copilot CLI uses `mcpServers` (not VS Code's `servers`) and spells the stdio transport as `"type": "local"`:
+
+```json
+{
+  "mcpServers": {
+    "rollbar": {
+      "type": "local",
+      "command": "npx",
+      "args": ["-y", "@rollbar/mcp-server@latest"],
+      "env": {
+        "ROLLBAR_ACCESS_TOKEN": "<project read/write access token>"
+      },
+      "tools": ["*"]
+    }
+  }
+}
+```
+
+Or with a config file, swap the `env` block for `ROLLBAR_CONFIG_FILE`:
+
+```json
+{
+  "mcpServers": {
+    "rollbar": {
+      "type": "local",
+      "command": "npx",
+      "args": ["-y", "@rollbar/mcp-server@latest"],
+      "env": {
+        "ROLLBAR_CONFIG_FILE": "/path/to/.rollbar-mcp.json"
+      },
+      "tools": ["*"]
+    }
+  }
+}
+```
+
+`tools: ["*"]` enables every Rollbar tool; narrow it to specific tool names if you'd rather opt in explicitly. To scope the server to one repository instead of your whole account, put the same JSON in `.mcp.json` or `.github/mcp.json` at the repo root — Copilot CLI loads project-level config only after you confirm folder trust on first launch, and project definitions take precedence over `~/.copilot/mcp-config.json`.
+
+Run `/mcp` inside an interactive session (or `copilot mcp list` from your shell) to confirm the server is connected.
