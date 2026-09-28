@@ -1,0 +1,62 @@
+name: Publish to npm
+
+on:
+  release:
+    types: [published]
+
+# id-token: write lets npm exchange the GitHub OIDC token for a short-lived
+# publish credential (npm trusted publishing) and sign provenance. No
+# NPM_TOKEN secret is used.
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.release.tag_name }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        ref: refs/tags/${{ github.event.release.tag_name }}
+
+    - name: Use Node.js 24.x
+      uses: actions/setup-node@v4
+      with:
+        node-version: 24.x
+
+    # Trusted publishing needs npm 11.5.1 or later.
+    - name: Update npm
+      run: npm install -g npm@^11.5.1
+
+    - name: Check package.json version matches release tag
+      id: version
+      env:
+        TAG: ${{ github.event.release.tag_name }}
+      run: |
+        VERSION=$(node -p "require('./package.json').version")
+        if [ "$VERSION" != "${TAG#v}" ]; then
+          echo "::error::package.json version ($VERSION) does not match release tag ($TAG)"
+          exit 1
+        fi
+        # Pre-release versions (e.g. 3.2.0-rc.1) go to the `next` dist-tag.
+        if [[ "$VERSION" == *-* ]]; then
+          echo "dist-tag=next" >> "$GITHUB_OUTPUT"
+        else
+          echo "dist-tag=latest" >> "$GITHUB_OUTPUT"
+        fi
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Build
+      run: npm run build --if-present
+
+    - name: Publish
+      run: npm publish --provenance --access public --tag "$DIST_TAG"
+      env:
+        DIST_TAG: ${{ steps.version.outputs.dist-tag }}
