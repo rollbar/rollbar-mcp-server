@@ -56,6 +56,13 @@ jobs:
     - name: Build
       run: npm run build --if-present
 
+    # .npmrc sets ignore-scripts=true, so npm publish skips prepublishOnly
+    # (build + test). Run the tests here so an untested tag can't publish.
+    - name: Test
+      run: npm test
+      env:
+        ROLLBAR_ACCESS_TOKEN: not-a-token
+
     - name: Publish
       run: npm publish --provenance --access public --tag "$DIST_TAG"
       env:
