@@ -290,7 +290,7 @@ describe("config", () => {
     await import("../../src/config.js");
 
     expect(console.error).toHaveBeenCalledWith(
-      expect.stringContaining("expected an account-only config"),
+      expect.stringContaining("Invalid Rollbar config file"),
     );
     expect(process.exit).toHaveBeenCalledWith(1);
   });

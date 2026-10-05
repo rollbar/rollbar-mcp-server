@@ -8,6 +8,8 @@ import { registerUpdateItemTool } from "./update-item.js";
 import { registerGetReplayTool } from "./get-replay.js";
 import { registerListProjectsTool } from "./list-projects.js";
 import { registerListOccurrencesTool } from "./list-occurrences.js";
+import { registerListItemEventsTool } from "./list-item-events.js";
+import { registerPostItemCommentTool } from "./post-item-comment.js";
 
 export function registerAllTools(server: McpServer) {
   registerGetItemDetailsTool(server);
@@ -19,4 +21,6 @@ export function registerAllTools(server: McpServer) {
   registerGetReplayTool(server);
   registerListProjectsTool(server);
   registerListOccurrencesTool(server);
+  registerListItemEventsTool(server);
+  registerPostItemCommentTool(server);
 }

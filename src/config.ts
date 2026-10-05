@@ -32,6 +32,7 @@ const RollbarMcpConfigSchema = z
     projects: z.array(ProjectConfigSchema).min(1),
     apiBase: HttpUrlSchema.optional(),
     accountToken: z.string().min(1).optional(),
+    userToken: z.string().min(1).optional(),
   })
   .passthrough()
   .refine((value) => !("token" in value), {
@@ -44,22 +45,22 @@ const RollbarMcpConfigShorthandSchema = z
     token: z.string().min(1),
     apiBase: HttpUrlSchema.optional(),
     accountToken: z.string().min(1).optional(),
+    userToken: z.string().min(1).optional(),
   })
   .passthrough()
   .refine((value) => !("projects" in value), {
     message: '"projects" is not allowed in single-project shorthand config.',
   });
 
-// Account-token-only config (no project-token entries at all): just
-// `{ "accountToken": "..." }`, optionally with `apiBase`. Neither the
-// multi-project nor the shorthand schema matches this shape since both
-// require a project token.
-const RollbarMcpConfigAccountOnlySchema = z
+// Account/user tokens can discover their projects without project-token entries.
+const RollbarMcpConfigAccountOrUserSchema = z
   .object({
-    accountToken: z.string().min(1),
+    accountToken: z.string().min(1).optional(),
+    userToken: z.string().min(1).optional(),
     apiBase: HttpUrlSchema.optional(),
   })
   .passthrough()
+  .refine((value) => Boolean(value.accountToken || value.userToken))
   .refine((value) => !("projects" in value) && !("token" in value), {
     message:
       '"projects"/"token" are not allowed in an account-token-only config.',
@@ -71,7 +72,7 @@ export interface ProjectConfig {
   apiBase: string;
 }
 
-export type AuthTokenType = "project" | "account";
+export type AuthTokenType = "project" | "account" | "user";
 
 export interface AuthContext {
   token: string;
@@ -110,6 +111,7 @@ function normalizeApiBase(value: string | undefined): string {
 interface LoadedFileConfig {
   projects: ProjectConfig[];
   accountToken?: string;
+  userToken?: string;
   apiBase: string;
 }
 
@@ -139,6 +141,7 @@ function loadProjectsFromFile(filePath: string): LoadedFileConfig | null {
         apiBase: sharedApiBase,
       })),
       accountToken: multi.data.accountToken,
+      userToken: multi.data.userToken,
       apiBase: sharedApiBase,
     };
   }
@@ -155,21 +158,23 @@ function loadProjectsFromFile(filePath: string): LoadedFileConfig | null {
         },
       ],
       accountToken: shorthand.data.accountToken,
+      userToken: shorthand.data.userToken,
       apiBase,
     };
   }
 
-  const accountOnly = RollbarMcpConfigAccountOnlySchema.safeParse(json);
-  if (accountOnly.success) {
+  const accountOrUser = RollbarMcpConfigAccountOrUserSchema.safeParse(json);
+  if (accountOrUser.success) {
     return {
       projects: [],
-      accountToken: accountOnly.data.accountToken,
-      apiBase: normalizeApiBase(accountOnly.data.apiBase),
+      accountToken: accountOrUser.data.accountToken,
+      userToken: accountOrUser.data.userToken,
+      apiBase: normalizeApiBase(accountOrUser.data.apiBase),
     };
   }
 
   throw new Error(
-    `Invalid Rollbar config file "${filePath}": expected an account-only config like { "accountToken": "..." }, a single-project config like { "token": "..." }, or a multi-project config like { "projects": [...] }.`,
+    `Invalid Rollbar config file "${filePath}": expected { "userToken": "..." }, { "accountToken": "..." }, a single-project config like { "token": "..." }, or a multi-project config like { "projects": [...] }.`,
   );
 }
 
@@ -179,14 +184,27 @@ function exitWithError(message: string): never {
   return undefined as never;
 }
 
-function resolveAccountTokenFromEnv(): string | undefined {
-  const envValue = process.env.ROLLBAR_ACCOUNT_ACCESS_TOKEN?.trim();
-  return envValue && envValue.length > 0 ? envValue : undefined;
+function resolveAccountCredentials(
+  config: { accountToken?: string; userToken?: string } = {},
+): { accountToken?: string; userToken?: string } {
+  const accountToken =
+    config.accountToken ??
+    (process.env.ROLLBAR_ACCOUNT_ACCESS_TOKEN?.trim() || undefined);
+  const userToken =
+    config.userToken ??
+    (process.env.ROLLBAR_USER_ACCESS_TOKEN?.trim() || undefined);
+  if (accountToken && userToken) {
+    throw new Error(
+      "Configure exactly one of accountToken / ROLLBAR_ACCOUNT_ACCESS_TOKEN or userToken / ROLLBAR_USER_ACCESS_TOKEN, not both.",
+    );
+  }
+  return { accountToken, userToken };
 }
 
 interface ResolvedConfig {
   projects: ProjectConfig[];
   accountToken?: string;
+  userToken?: string;
   apiBase: string;
   // True only when the single project in `projects` came from the legacy
   // ROLLBAR_ACCESS_TOKEN env var (loadConfig() step 4), as opposed to a
@@ -209,7 +227,7 @@ function loadConfig(): ResolvedConfig {
       if (loaded) {
         return {
           projects: loaded.projects,
-          accountToken: loaded.accountToken ?? resolveAccountTokenFromEnv(),
+          ...resolveAccountCredentials(loaded),
           apiBase: loaded.apiBase,
         };
       }
@@ -230,7 +248,7 @@ function loadConfig(): ResolvedConfig {
     if (fromCwd) {
       return {
         projects: fromCwd.projects,
-        accountToken: fromCwd.accountToken ?? resolveAccountTokenFromEnv(),
+        ...resolveAccountCredentials(fromCwd),
         apiBase: fromCwd.apiBase,
       };
     }
@@ -247,7 +265,7 @@ function loadConfig(): ResolvedConfig {
     if (fromHome) {
       return {
         projects: fromHome.projects,
-        accountToken: fromHome.accountToken ?? resolveAccountTokenFromEnv(),
+        ...resolveAccountCredentials(fromHome),
         apiBase: fromHome.apiBase,
       };
     }
@@ -257,11 +275,16 @@ function loadConfig(): ResolvedConfig {
     );
   }
 
-  // 4. ROLLBAR_ACCESS_TOKEN / ROLLBAR_ACCOUNT_ACCESS_TOKEN env vars
+  // 4. Project, account, or user token environment variables.
   const token = process.env.ROLLBAR_ACCESS_TOKEN?.trim();
-  const accountToken = resolveAccountTokenFromEnv();
+  let credentials: ReturnType<typeof resolveAccountCredentials>;
+  try {
+    credentials = resolveAccountCredentials();
+  } catch (error) {
+    return exitWithError((error as Error).message);
+  }
 
-  if ((token && token.length > 0) || accountToken) {
+  if (token || credentials.accountToken || credentials.userToken) {
     const apiBase = resolveApiBaseFromEnv();
     if (apiBase === null) {
       return exitWithError(
@@ -284,14 +307,14 @@ function loadConfig(): ResolvedConfig {
 
     return {
       projects,
-      accountToken,
+      ...credentials,
       apiBase,
       isLegacyEnvToken: token !== undefined && token.length > 0,
     };
   }
 
   return exitWithError(
-    "Error: No Rollbar configuration found. Set ROLLBAR_ACCESS_TOKEN or ROLLBAR_ACCOUNT_ACCESS_TOKEN, or create .rollbar-mcp.json (in cwd or home), or set ROLLBAR_CONFIG_FILE.",
+    "Error: No Rollbar configuration found. Set ROLLBAR_USER_ACCESS_TOKEN, ROLLBAR_ACCESS_TOKEN or ROLLBAR_ACCOUNT_ACCESS_TOKEN, or create .rollbar-mcp.json (in cwd or home), or set ROLLBAR_CONFIG_FILE.",
   );
 }
 
@@ -305,14 +328,18 @@ const resolvedConfig: ResolvedConfig = loadConfig() ?? {
 
 export const PROJECTS: ProjectConfig[] = resolvedConfig.projects;
 
-const ACCOUNT_TOKEN: string | undefined = resolvedConfig.accountToken;
+const ACCOUNT_AUTH = resolvedConfig.userToken
+  ? { token: resolvedConfig.userToken, tokenType: "user" as const }
+  : resolvedConfig.accountToken
+    ? { token: resolvedConfig.accountToken, tokenType: "account" as const }
+    : undefined;
 
-// Whether an explicit account token (env var or config file key) is
+// Whether an explicit account or user token (env var or config file key) is
 // configured. Used by buildProjectParam() to decide the `project` param's
 // schema — a hybrid config (explicit project tokens + an account token) must
 // not restrict `project` to just the explicitly-listed names, since the
 // account token can also reach any other project on the account.
-export const HAS_ACCOUNT_TOKEN: boolean = Boolean(ACCOUNT_TOKEN);
+export const HAS_ACCOUNT_TOKEN: boolean = Boolean(ACCOUNT_AUTH);
 
 const DEFAULT_API_BASE: string = resolvedConfig.apiBase;
 const IS_LEGACY_ENV_TOKEN: boolean = resolvedConfig.isLegacyEnvToken ?? false;
@@ -408,8 +435,10 @@ export function resolveProject(name: string | undefined): ProjectConfig {
  * support should use this instead.
  *
  * Precedence:
+ *   User mode always uses the connected user's credentials, even when project
+ *   tokens are also configured. An account token and a user token cannot coexist.
  *   a. An explicitly configured project with its own token, matching by
- *      name — unchanged from today's project-token behavior. Always wins.
+ *      name — unchanged from today's project/account-token behavior.
  *   b. An account token (config `accountToken` or ROLLBAR_ACCOUNT_ACCESS_TOKEN)
  *      — resolves `project` (name or numeric id) against the projects cache.
  *   c. The legacy ROLLBAR_ACCESS_TOKEN-only path — lazily probes GET /projects
@@ -417,9 +446,16 @@ export function resolveProject(name: string | undefined): ProjectConfig {
  */
 export async function resolveAuthContext(
   project: string | undefined,
+  options: { requireUserToken?: boolean } = {},
 ): Promise<AuthContext> {
-  // (a) Explicit project-token config always wins for a named project.
-  if (project !== undefined) {
+  if (options.requireUserToken && ACCOUNT_AUTH?.tokenType !== "user") {
+    throw new Error(
+      "Posting comments requires a user access token. Set userToken in .rollbar-mcp.json or ROLLBAR_USER_ACCESS_TOKEN with read and write scope.",
+    );
+  }
+
+  // (a) Explicit project tokens take precedence only outside user mode.
+  if (project !== undefined && ACCOUNT_AUTH?.tokenType !== "user") {
     const explicit = PROJECTS.find((p) => p.name === project);
     if (explicit) {
       return {
@@ -430,16 +466,15 @@ export async function resolveAuthContext(
     }
   }
 
-  // (b) Explicit account token present (env or config file key).
-  if (ACCOUNT_TOKEN) {
+  // (b) Explicit account/user token present (env or config file key).
+  if (ACCOUNT_AUTH) {
     const projectId = await resolveProjectId(
-      ACCOUNT_TOKEN,
+      ACCOUNT_AUTH.token,
       DEFAULT_API_BASE,
       project,
     );
     return {
-      token: ACCOUNT_TOKEN,
-      tokenType: "account",
+      ...ACCOUNT_AUTH,
       projectId,
       apiBase: DEFAULT_API_BASE,
     };
@@ -499,7 +534,7 @@ export interface AccountModeInfo {
 
 /**
  * Reports whether the server is currently operating in account-token mode
- * (an explicit accountToken/ROLLBAR_ACCOUNT_ACCESS_TOKEN, or a legacy
+ * (an explicit account/user token, or a legacy
  * ROLLBAR_ACCESS_TOKEN that the lazy probe determined is actually an
  * account token) — used by tools/resources that need to branch on "am I
  * addressing one project or a whole account" without needing to resolve a
@@ -507,11 +542,11 @@ export interface AccountModeInfo {
  * single-vs-multi-project guard).
  */
 export async function getAccountModeInfo(): Promise<AccountModeInfo> {
-  if (ACCOUNT_TOKEN) {
-    const projects = await getProjects(ACCOUNT_TOKEN, DEFAULT_API_BASE);
+  if (ACCOUNT_AUTH) {
+    const projects = await getProjects(ACCOUNT_AUTH.token, DEFAULT_API_BASE);
     return {
       active: true,
-      token: ACCOUNT_TOKEN,
+      token: ACCOUNT_AUTH.token,
       apiBase: DEFAULT_API_BASE,
       enabledProjectCount: projects.length,
     };

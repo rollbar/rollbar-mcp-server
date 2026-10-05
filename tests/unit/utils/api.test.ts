@@ -213,7 +213,7 @@ describe('api utilities', () => {
 
         await expect(
           makeRollbarRequest('https://api.rollbar.com/api/1/projects', 'list-projects', 'test-token')
-        ).rejects.toThrow(/requires an account access token/);
+        ).rejects.toThrow(/requires an account or user token/);
       });
 
       it('adds an update-item-specific write-scope hint on 403 for update-item', async () => {
