@@ -326,7 +326,11 @@ const resolvedConfig: ResolvedConfig = loadConfig() ?? {
   apiBase: DEFAULT_ROLLBAR_API_BASE,
 };
 
-export const PROJECTS: ProjectConfig[] = resolvedConfig.projects;
+// Only expose selectable project-token entries. User mode ignores these
+// credentials, so they must not count as additional projects for replay access.
+export const PROJECTS: ProjectConfig[] = resolvedConfig.userToken
+  ? []
+  : resolvedConfig.projects;
 
 const ACCOUNT_AUTH = resolvedConfig.userToken
   ? { token: resolvedConfig.userToken, tokenType: "user" as const }
@@ -454,8 +458,8 @@ export async function resolveAuthContext(
     );
   }
 
-  // (a) Explicit project tokens take precedence only outside user mode.
-  if (project !== undefined && ACCOUNT_AUTH?.tokenType !== "user") {
+  // (a) Selectable project tokens take precedence for a matching name.
+  if (project !== undefined) {
     const explicit = PROJECTS.find((p) => p.name === project);
     if (explicit) {
       return {
