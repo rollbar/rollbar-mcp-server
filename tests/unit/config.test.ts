@@ -7,6 +7,7 @@ describe('config utilities', () => {
 
   beforeEach(async () => {
     vi.resetModules();
+    vi.stubEnv('ROLLBAR_USER_ACCESS_TOKEN', undefined);
     originalToken = process.env.ROLLBAR_ACCESS_TOKEN;
     // Force a token during the test run only when CI hasn't provided one so importing config.ts doesn't call process.exit.
     if (originalToken === undefined) {
@@ -20,6 +21,7 @@ describe('config utilities', () => {
   });
 
   afterEach(() => {
+    vi.unstubAllEnvs();
     // Put back the original token (or clear it) so parallel tests see the same environment state.
     if (originalToken === undefined) {
       delete process.env.ROLLBAR_ACCESS_TOKEN;
