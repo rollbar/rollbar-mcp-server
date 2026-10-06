@@ -241,67 +241,97 @@ describe('MCP Server Integration', () => {
   });
 
   it('should not output anything to stdout during server startup', async () => {
-    const { spawn } = await import('child_process');
-    const { promisify } = await import('util');
-    const execAsync = promisify((await import('child_process')).exec);
+    const { spawn, exec } = await import('node:child_process');
+    const { mkdtemp, writeFile, rm } = await import('node:fs/promises');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    const { fileURLToPath } = await import('node:url');
+    const { promisify } = await import('node:util');
+    const execAsync = promisify(exec);
 
     // First ensure the server is built
     await execAsync('npm run build');
 
-    // Spawn the server process to capture its output
-    const serverProcess = spawn('node', ['build/index.js'], {
-      stdio: ['pipe', 'pipe', 'pipe'],
-      env: { ...process.env, ROLLBAR_ACCESS_TOKEN: 'test-token' }
-    });
+    const testDirectory = await mkdtemp(join(tmpdir(), 'rollbar-mcp-startup-'));
+    try {
+      const configPath = join(testDirectory, 'config.json');
+      await writeFile(configPath, JSON.stringify({ token: 'test-token' }));
+      const env = { ...process.env };
+      for (const name of [
+        'ROLLBAR_ACCESS_TOKEN',
+        'ROLLBAR_ACCOUNT_ACCESS_TOKEN',
+        'ROLLBAR_USER_ACCESS_TOKEN',
+        'ROLLBAR_API_BASE',
+      ]) {
+        delete env[name];
+      }
+      env.ROLLBAR_CONFIG_FILE = configPath;
 
-    let stdoutOutput = '';
-
-    // Collect stdout output
-    serverProcess.stdout?.on('data', (data) => {
-      stdoutOutput += data.toString();
-    });
-
-    // Send initialization request to trigger server startup
-    const initRequest = JSON.stringify({
-      jsonrpc: "2.0",
-      method: "initialize",
-      params: {
-        protocolVersion: "1.0.0",
-        capabilities: {},
-        clientInfo: { name: "test-client", version: "1.0.0" }
-      },
-      id: 1
-    }) + '\n';
-
-    serverProcess.stdin?.write(initRequest);
-
-    // Wait for server to process the request or timeout
-    await new Promise<void>((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        serverProcess.kill();
-        reject(new Error('Server startup timeout'));
-      }, 5000);
-
-      serverProcess.stdout?.on('data', (data) => {
-        const response = data.toString();
-        if (response.includes('"jsonrpc":"2.0"')) {
-          clearTimeout(timeout);
-          serverProcess.kill();
-          resolve();
-        }
+      // The child does not share Vitest's config mock. An explicit config
+      // bypasses cwd/home configs, and an empty cwd prevents loading .env.
+      const serverPath = fileURLToPath(
+        new URL('../../build/index.js', import.meta.url)
+      );
+      const serverProcess = spawn(process.execPath, [serverPath], {
+        cwd: testDirectory,
+        stdio: ['pipe', 'pipe', 'pipe'],
+        env,
+      });
+      const closed = new Promise<void>((resolve) => {
+        serverProcess.once('close', () => resolve());
+      });
+      let stdoutOutput = '';
+      let stderrOutput = '';
+      let timeout: ReturnType<typeof setTimeout> | undefined;
+      serverProcess.stdout.setEncoding('utf8');
+      serverProcess.stderr.setEncoding('utf8');
+      serverProcess.stderr.on('data', (data) => {
+        stderrOutput += data;
       });
 
-      serverProcess.on('error', (err) => {
+      try {
+        await new Promise<void>((resolve, reject) => {
+          timeout = setTimeout(() => {
+            reject(new Error('Server startup timeout'));
+          }, 5000);
+          serverProcess.stdout.on('data', (data) => {
+            stdoutOutput += data;
+            // Wait for a complete stdio frame, even when JSON spans chunks.
+            if (stdoutOutput.includes('\n')) resolve();
+          });
+          serverProcess.once('error', reject);
+          serverProcess.stdin.once('error', reject);
+          serverProcess.once('close', (code, signal) => {
+            reject(new Error(
+              `Server exited before initialization (code=${code}, signal=${signal}): ${stderrOutput}`
+            ));
+          });
+          serverProcess.stdin.write(JSON.stringify({
+            jsonrpc: '2.0',
+            method: 'initialize',
+            params: {
+              protocolVersion: '1.0.0',
+              capabilities: {},
+              clientInfo: { name: 'test-client', version: '1.0.0' },
+            },
+            id: 1,
+          }) + '\n');
+        });
+      } finally {
         clearTimeout(timeout);
-        reject(err);
-      });
-    });
+        serverProcess.kill();
+        await closed;
+      }
 
-    // The MCP JSON response is expected, but anything else is not.
-    // If response is not valid json, fail the test.
-    var response = JSON.parse(stdoutOutput);
-    expect(response.result).toBeDefined();
-  });
+      // The MCP JSON response is expected, but anything else is not.
+      const response = JSON.parse(stdoutOutput);
+      expect(response.jsonrpc).toBe('2.0');
+      expect(response.id).toBe(1);
+      expect(response.result).toBeDefined();
+    } finally {
+      await rm(testDirectory, { recursive: true, force: true });
+    }
+  }, 10000);
 
   it('should handle concurrent tool registration', () => {
     server = new McpServer({
