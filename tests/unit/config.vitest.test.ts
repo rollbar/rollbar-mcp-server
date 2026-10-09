@@ -21,9 +21,11 @@ describe("config", () => {
 
   beforeEach(() => {
     process.env = { ...originalEnv, ROLLBAR_ACCESS_TOKEN: "test-token" };
+    delete process.env.ROLLBAR_ACCOUNT_ACCESS_TOKEN;
+    delete process.env.ROLLBAR_USER_ACCESS_TOKEN;
     delete process.env.ROLLBAR_API_BASE;
     delete process.env.ROLLBAR_CONFIG_FILE;
-    process.exit = vi.fn() as typeof process.exit;
+    process.exit = vi.fn<typeof process.exit>();
     console.error = vi.fn();
     existsSyncMock.mockReturnValue(false);
     readFileSyncMock.mockReset();
@@ -290,7 +292,7 @@ describe("config", () => {
     await import("../../src/config.js");
 
     expect(console.error).toHaveBeenCalledWith(
-      expect.stringContaining("expected an account-only config"),
+      expect.stringContaining("Invalid Rollbar config file"),
     );
     expect(process.exit).toHaveBeenCalledWith(1);
   });

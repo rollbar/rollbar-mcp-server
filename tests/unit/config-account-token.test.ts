@@ -34,9 +34,10 @@ describe("config — account access token support", () => {
     process.env = { ...originalEnv };
     delete process.env.ROLLBAR_ACCESS_TOKEN;
     delete process.env.ROLLBAR_ACCOUNT_ACCESS_TOKEN;
+    delete process.env.ROLLBAR_USER_ACCESS_TOKEN;
     delete process.env.ROLLBAR_API_BASE;
     delete process.env.ROLLBAR_CONFIG_FILE;
-    process.exit = vi.fn() as typeof process.exit;
+    process.exit = vi.fn<typeof process.exit>();
     console.error = vi.fn();
     existsSyncMock.mockReturnValue(false);
     readFileSyncMock.mockReset();
