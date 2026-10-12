@@ -169,3 +169,46 @@ export interface RollbarListOccurrencesResponse {
   instances: RollbarOccurrenceResponse[];
   [key: string]: any; // Allow for any other properties
 }
+
+export const ITEM_EVENT_TYPES = [
+  "item_comment",
+  "item_level_history",
+  "item_status_history",
+  "item_snooze_history",
+  "item_assigned_user_history",
+  "item_assigned_team_history",
+  "item_title_history",
+  "item_group_history",
+  "item_merge_history",
+] as const;
+
+export interface RollbarItemEventResponse {
+  id: number;
+  type: (typeof ITEM_EVENT_TYPES)[number];
+  item_id: number;
+  user_id: number | null;
+  username: string | null;
+  timestamp: number;
+  // History types have different details; pass them through without projection.
+  [key: string]: unknown;
+}
+
+export interface RollbarListItemEventsResponse {
+  events: RollbarItemEventResponse[];
+  page: number;
+  total_count: number;
+  [key: string]: unknown;
+}
+
+export interface RollbarItemCommentResponse {
+  id: number;
+  type: "comment";
+  source: "comment" | "resolve_note";
+  item_id: number;
+  user_id: number;
+  username: string | null;
+  timestamp: number;
+  text: string | null;
+  via_api: boolean;
+  [key: string]: unknown;
+}

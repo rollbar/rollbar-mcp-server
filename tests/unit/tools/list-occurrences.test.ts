@@ -100,7 +100,7 @@ describe("list-occurrences tool", () => {
     });
 
     expect(makeRollbarRequestMock).toHaveBeenCalledWith(
-      "https://api.rollbar.com/api/1/item/?counter=42",
+      "https://api.rollbar.com/api/1/item?counter=42",
       "list-occurrences",
       "test-token",
     );
@@ -383,7 +383,7 @@ describe("list-occurrences tool", () => {
     });
 
     expect(makeRollbarRequestMock).toHaveBeenCalledWith(
-      "https://api.rollbar.com/api/1/item/?counter=42&project_id=77",
+      "https://api.rollbar.com/api/1/item?counter=42&project_id=77",
       "list-occurrences",
       "acct-token",
     );

@@ -12,18 +12,21 @@ function buildAuthErrorHint(
   const isProjectsEndpoint = /\/projects(\?|$)/.test(url);
 
   if (status === 403 && isProjectsEndpoint) {
-    return "This endpoint requires an account access token (GET /projects is account-token-only; a project token returns 403 here). Set ROLLBAR_ACCOUNT_ACCESS_TOKEN or the accountToken config key to use account mode.";
+    return "Project discovery requires an account or user token with read scope and access to the account. Configure accountToken / ROLLBAR_ACCOUNT_ACCESS_TOKEN or userToken / ROLLBAR_USER_ACCESS_TOKEN; project tokens cannot list account projects.";
   }
 
   if (status === 401) {
-    return "The Rollbar access token appears to be invalid or expired. Check ROLLBAR_ACCESS_TOKEN / ROLLBAR_ACCOUNT_ACCESS_TOKEN (or the token in your .rollbar-mcp.json config).";
+    return "The Rollbar access token appears to be invalid or expired. Check ROLLBAR_ACCESS_TOKEN / ROLLBAR_ACCOUNT_ACCESS_TOKEN / ROLLBAR_USER_ACCESS_TOKEN (or the token in your .rollbar-mcp.json config).";
   }
 
   if (status === 403) {
+    if (toolName === "post-item-comment") {
+      return "Posting requires a user-scoped account token with read and write scope and comment permission on the selected project. Configure userToken / ROLLBAR_USER_ACCESS_TOKEN; project and account-wide tokens cannot post comments.";
+    }
     if (toolName === "update-item") {
       return "The token does not have sufficient privileges for this write operation. update-item requires a token (project or account) with write scope — read-only tokens will get a 403 here.";
     }
-    return "The token does not have sufficient privileges for this request. Check that it has the required scope (read, or write for update-item) for this project/account.";
+    return "The token does not have sufficient privileges for this request. Check its scope and the user's project permissions; requested features such as snooze history may also require account access.";
   }
 
   return "";
