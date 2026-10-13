@@ -4,9 +4,9 @@ import { resolveAuthContext } from "../config.js";
 import { makeRollbarRequest } from "../utils/api.js";
 import { buildProjectParam } from "../utils/project-params.js";
 import { injectProjectIdQueryParam } from "../utils/params.js";
+import { getItemByCounter } from "../utils/item.js";
 import {
   RollbarApiResponse,
-  RollbarItemResponse,
   RollbarOccurrenceResponse,
 } from "../types/index.js";
 import { truncateOccurrence } from "../utils/truncation.js";
@@ -30,21 +30,7 @@ export function registerGetItemDetailsTool(server: McpServer) {
     async ({ counter, max_tokens, project }) => {
       const auth = await resolveAuthContext(project);
       const { token, apiBase } = auth;
-      const counterUrl = injectProjectIdQueryParam(
-        `${apiBase}/item?counter=${counter}`,
-        auth,
-      );
-      const itemResponse = await makeRollbarRequest<
-        RollbarApiResponse<RollbarItemResponse>
-      >(counterUrl, "get-item-details", token);
-
-      if (itemResponse.err !== 0) {
-        const errorMessage =
-          itemResponse.message || `Unknown error (code: ${itemResponse.err})`;
-        throw new Error(`Rollbar API returned error: ${errorMessage}`);
-      }
-
-      const item = itemResponse.result;
+      const item = await getItemByCounter(counter, auth, "get-item-details");
 
       const occurrenceUrl = injectProjectIdQueryParam(
         `${apiBase}/instance/${item.last_occurrence_id}`,

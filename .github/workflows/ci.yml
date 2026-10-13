@@ -43,6 +43,9 @@ jobs:
       run: npm run test:coverage
       env:
         ROLLBAR_ACCESS_TOKEN: not-a-token
+        # Config tests must isolate credentials inherited from the environment.
+        ROLLBAR_USER_ACCESS_TOKEN: not-a-user-token
+        ROLLBAR_ACCOUNT_ACCESS_TOKEN: not-an-account-token
 
     - name: Run end-to-end tests
       run: npm run test:e2e

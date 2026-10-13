@@ -2,7 +2,7 @@ import { AuthContext } from "../config.js";
 
 /**
  * Appends `project_id=<id>` as a single query param to `url`. No-op
- * (returns `url` unchanged) when `auth.tokenType !== 'account'` or
+ * (returns `url` unchanged) when using a project token or
  * `auth.projectId` is not set — project-token mode is never touched.
  *
  * Use for: GET /deploys, GET /versions/{v}, GET /reports/top_active_items,
@@ -12,7 +12,7 @@ export function injectProjectIdQueryParam(
   url: string,
   auth: AuthContext,
 ): string {
-  if (auth.tokenType !== "account" || auth.projectId === undefined) {
+  if (auth.tokenType === "project" || auth.projectId === undefined) {
     return url;
   }
 
@@ -22,7 +22,7 @@ export function injectProjectIdQueryParam(
 
 /**
  * Merges `project_id` into a JSON request body object. No-op when
- * `auth.tokenType !== 'account'` or `auth.projectId` is not set.
+ * using a project token or `auth.projectId` is not set.
  *
  * Use for: PATCH /item/{id} (update-item).
  */
@@ -30,7 +30,7 @@ export function injectProjectIdBodyParam<T extends Record<string, unknown>>(
   body: T,
   auth: AuthContext,
 ): T | (T & { project_id: number }) {
-  if (auth.tokenType !== "account" || auth.projectId === undefined) {
+  if (auth.tokenType === "project" || auth.projectId === undefined) {
     return body;
   }
 
@@ -47,7 +47,7 @@ export function injectProjectIdBodyParam<T extends Record<string, unknown>>(
  * NEVER produce either shape. It only ever appends `project_ids=<id>` (the
  * plural key, one bare numeric value per occurrence).
  *
- * No-op when `auth.tokenType !== 'account'` or `auth.projectId` is not set.
+ * No-op when using a project token or `auth.projectId` is not set.
  *
  * Use for: GET /items/ (list-items).
  */
@@ -55,7 +55,7 @@ export function injectProjectIdsRepeatedQueryParam(
   url: string,
   auth: AuthContext,
 ): string {
-  if (auth.tokenType !== "account" || auth.projectId === undefined) {
+  if (auth.tokenType === "project" || auth.projectId === undefined) {
     return url;
   }
 

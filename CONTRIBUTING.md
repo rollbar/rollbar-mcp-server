@@ -86,6 +86,21 @@ You can use `ROLLBAR_CONFIG_FILE` in `env` instead of `ROLLBAR_ACCESS_TOKEN` for
 
 ## Testing
 
+### Live item history and comment check
+
+`node tests/e2e/test-item-history.mjs` exercises the built server over stdio: list history, filter it, post one comment, and read it back with the expected author and `via_api` marker. This is an opt-in test that **leaves a comment on the selected item**. Use a staging or dedicated test item. It does not retry the POST.
+
+Build with `npm run build`, then set these environment variables before running the script:
+
+- `ROLLBAR_E2E_CONFIG_FILE`: absolute path to a local MCP config containing `userToken` (read and write scope), and `apiBase` if using staging. Do not commit this file.
+- `ROLLBAR_E2E_PROJECT`: the test project's name or numeric ID.
+- `ROLLBAR_E2E_ITEM_ID`: the test item's global ID, not its counter.
+- `ROLLBAR_E2E_USER_ID`: the expected token owner's numeric Rollbar user ID.
+
+The regular `npm test` suite uses mocked external API responses and does not post live comments. The live check is intentionally separate from it and from `npm run test:e2e`.
+
+### Inspector and existing end-to-end checks
+
 Test an individual tool with the MCP inspector. List tools:
 
 ```bash
