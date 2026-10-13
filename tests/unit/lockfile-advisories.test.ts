@@ -2,9 +2,9 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 
 // Minimum patched versions for transitive dependencies that have been flagged
-// by Dependabot (SDK-730). Keyed by package, then by major version, because a
-// lockfile can hold several copies of one package on different major lines
-// (e.g. brace-expansion 1.x under eslint and 5.x under typescript-eslint).
+// by Dependabot (SDK-730, SDK-773). Keyed by package, then by major version,
+// because a lockfile can hold several copies of one package on different major
+// lines (e.g. brace-expansion 1.x under eslint and 5.x under typescript-eslint).
 // When a new alert is fixed by refreshing the lockfile, raise or add the floor
 // here so a later lockfile regeneration can't silently reintroduce it.
 const PATCHED_FLOORS: Record<string, Record<number, string>> = {
@@ -20,6 +20,16 @@ const PATCHED_FLOORS: Record<string, Record<number, string>> = {
   undici: { 7: "7.29.1" },
   // GHSA-p498-v437-472g
   "@humanfs/node": { 0: "0.16.8" },
+  // GHSA-6qxp-vccf-f47h (also floored in package.json)
+  "@modelcontextprotocol/sdk": { 1: "1.31.0" },
+  // GHSA-pqg4-j6r4-53mv
+  "shell-quote": { 1: "1.11.0" },
+  // GHSA-jqcg-44mw-7w3h
+  "proxy-addr": { 2: "2.0.8" },
+  // GHSA-68fv-2mgg-jv7q
+  "source-map-js": { 1: "1.2.2" },
+  // GHSA-hxh3-vqpv-xpqv
+  hono: { 4: "4.13.7" },
 };
 
 interface LockfilePackage {
