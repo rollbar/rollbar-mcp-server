@@ -55,13 +55,13 @@
     "@eslint/js": "^9.39.5",
     "@modelcontextprotocol/inspector": "0.16.6",
     "@types/node": "^24.13.3",
-    "@vitest/coverage-v8": "^4.1.11",
+    "@vitest/coverage-v8": "^4.1.12",
     "eslint": "^9.39.5",
     "eslint-config-prettier": "^10.1.2",
     "eslint-plugin-prettier": "^5.5.6",
     "prettier": "^3.9.6",
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.68.0",
-    "vitest": "^4.1.11"
+    "vitest": "^4.1.12"
   }
 }
