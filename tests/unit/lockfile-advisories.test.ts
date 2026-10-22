@@ -2,14 +2,15 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 
 // Minimum patched versions for transitive dependencies that have been flagged
-// by Dependabot (SDK-730, SDK-773). Keyed by package, then by major version,
-// because a lockfile can hold several copies of one package on different major
-// lines (e.g. brace-expansion 1.x under eslint and 5.x under typescript-eslint).
+// by Dependabot (SDK-730, SDK-773, SDK-798). Keyed by package, then by major
+// version, because a lockfile can hold several copies of one package on
+// different major lines (e.g. brace-expansion 1.x under eslint and 5.x under
+// typescript-eslint).
 // When a new alert is fixed by refreshing the lockfile, raise or add the floor
 // here so a later lockfile regeneration can't silently reintroduce it.
 const PATCHED_FLOORS: Record<string, Record<number, string>> = {
-  // GHSA-j6r3-76f7-8jcv, GHSA-h3mg-xc3c-68pw
-  "ip-address": { 10: "10.7.1" },
+  // GHSA-j6r3-76f7-8jcv, GHSA-h3mg-xc3c-68pw, GHSA-rxp7-6hxx-x8q5
+  "ip-address": { 10: "10.7.4" },
   // GHSA-q2hr-2g5m-vwhr
   "brace-expansion": { 1: "1.1.21", 5: "5.0.12" },
   // GHSA-58mr-gqgx-xq4g, GHSA-qw65-cvwx-89v3
@@ -30,6 +31,11 @@ const PATCHED_FLOORS: Record<string, Record<number, string>> = {
   "source-map-js": { 1: "1.2.2" },
   // GHSA-hxh3-vqpv-xpqv
   hono: { 4: "4.13.7" },
+  // GHSA-698v-4r3x-3vcv, GHSA-587h-7wmj-h5pm, GHSA-r825-w8mm-5pxw
+  vite: { 8: "8.2.4" },
+  // GHSA-qxg6-89mg-rqv8, GHSA-xp26-3454-mjgp (also floored via vitest in
+  // package.json)
+  "@vitest/mocker": { 4: "4.1.12" },
 };
 
 interface LockfilePackage {
