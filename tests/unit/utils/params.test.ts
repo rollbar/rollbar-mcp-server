@@ -3,6 +3,7 @@ import {
   injectProjectIdQueryParam,
   injectProjectIdBodyParam,
   injectProjectIdsRepeatedQueryParam,
+  injectProjectIdsMetricsFilter,
 } from "../../../src/utils/params.js";
 import type { AuthContext } from "../../../src/config.js";
 
@@ -125,6 +126,51 @@ describe("params injection helper", () => {
       injectProjectIdBodyParam(original, accountAuth);
       expect(original).toEqual({ status: "resolved" });
       expect(original).not.toHaveProperty("project_id");
+    });
+  });
+
+  describe("injectProjectIdsMetricsFilter", () => {
+    const environmentFilter = {
+      field: "environment",
+      operator: "eq",
+      values: ["production"],
+    };
+
+    it("appends one project_id eq filter listing every id for POST /metrics/occurrences", () => {
+      expect(injectProjectIdsMetricsFilter([environmentFilter], [42, 7])).toEqual([
+        environmentFilter,
+        { field: "project_id", operator: "eq", values: [42, 7] },
+      ]);
+    });
+
+    it("adds the filter when there are no other filters", () => {
+      expect(injectProjectIdsMetricsFilter([], [42])).toEqual([
+        { field: "project_id", operator: "eq", values: [42] },
+      ]);
+    });
+
+    it("is a no-op passthrough when no projects are selected", () => {
+      const filters = [environmentFilter];
+      expect(injectProjectIdsMetricsFilter(filters, undefined)).toBe(filters);
+    });
+
+    it("fails closed on an empty list instead of dropping the filter", () => {
+      expect(injectProjectIdsMetricsFilter([], [])).toEqual([
+        { field: "project_id", operator: "eq", values: [] },
+      ]);
+    });
+
+    it("does not mutate or alias its inputs", () => {
+      const filters = [environmentFilter];
+      const ids = [42];
+      const result = injectProjectIdsMetricsFilter(filters, ids);
+      ids.push(7);
+      expect(filters).toEqual([environmentFilter]);
+      expect(result.at(-1)).toEqual({
+        field: "project_id",
+        operator: "eq",
+        values: [42],
+      });
     });
   });
 

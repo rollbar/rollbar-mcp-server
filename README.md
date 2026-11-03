@@ -91,7 +91,7 @@ If a config file exists but is invalid, the server exits with an error instead o
 
 Required scopes:
 
-- Read-only tools (`get-item-details`, `get-deployments`, `get-version`, `get-top-items`, `list-items`, `get-replay`, `list-projects`, `list-occurrences`, `list-item-events`) work with a **read**-scope account or user token, subject to project permissions.
+- Read-only tools (`get-item-details`, `get-deployments`, `get-version`, `get-top-items`, `list-items`, `get-replay`, `list-projects`, `list-occurrences`, `list-item-events`, `get-occurrence-metrics`) work with a **read**-scope account or user token, subject to project permissions. `get-occurrence-metrics` also requires the account's Advanced package.
 - `update-item` requires an account token with **both read and write** scope: every account-token call resolves the target project via `GET /projects` first (read), then makes the `PATCH` request (write). A write-only token will fail at the project-resolution step before ever reaching the update.
 - As with project tokens, prefer a read-scope token unless you specifically need `update-item`.
 - `post-item-comment` requires a **user** token with **read and write** scope and project **comment** permission.
@@ -113,6 +113,24 @@ If the server detects only `ROLLBAR_ACCESS_TOKEN` is set (no explicit account to
 `get-top-items(environment, project?)`: See what's actually breaking right now. Returns the items with the most occurrences in the last 24 hours for the given environment, so you can triage what to look at first instead of scanning the full item list. Optional `project` when multiple projects are configured or in account-token mode.
 
 `list-items(status?, level?, environment?, page?, limit?, query?, project?)`: Search and filter Rollbar items instead of pulling the whole list. Filter by `status` (default `active`, so resolved and muted items stay out of your way), `level`, and `environment`, or search by `query` text. Use `page` and `limit` to control how much comes back at once. Optional `project` when multiple projects are configured or in account-token mode.
+
+`get-occurrence-metrics(start_time?, end_time?, granularity?, timezone?, filters?, group_by?, aggregates?, sort?, limit?, offset?, project?)`: Answer "how many, and broken down by what" questions across occurrences in one or more projects, such as daily error counts per item, which browsers or code versions an error hits, how many distinct users it affected, or which projects log a given message. It calls the Rollbar Metrics API (`POST /api/1/metrics/occurrences`), which requires the account's Advanced package. Other accounts get a 403.
+
+`start_time` and `end_time` are Unix seconds. Leave out `start_time` to start at the account's data retention boundary, and leave out `end_time` for no upper bound. With `granularity` (`second` through `year`), rows are bucketed into one timepoint per period, in `timezone` (default UTC). Without it, everything comes back in a single timepoint. `filters` must all match. Each filter takes a `field`, an `operator` (`eq`, `ne`, `gt`, `gte`, `lt`, `lte`, `like`, `ilike`, `is_null`, `not_null`), `values`, and, for key/value columns like `request_headers` or `customs`, a `key`. `aggregates` take a `field`, a `function` (`count_all`, `count_distinct`, `max`, `min`, `sum`, `topk`, `quantiles`, `array`, `json_array_length`), an `alias`, and optional string `parameters`. `sort` is one `{ field, order }` or a list of them. The default order is timestamp ascending, so sort by `occurrence_count` descending for top-N questions.
+
+The result is `{ timepoints: [{ timestamp, rows }], last_occurrence_timestamp, row_count }`. Each row is a flat object holding its `group_by` columns, aggregate aliases, and `occurrence_count`. Rows also include `project_slug` when grouped by `project_id`. The API returns every matching row when no limit is given, so this tool always sends `limit` (default 100, max 1000). When a page is full, the result includes `next_offset` to pass as `offset`.
+
+`project` chooses which projects to query; a `project_id` filter is rejected. With an account or user token, omit `project` to query every project the token can read, or pass a name or id, or a list of them, to query only those. Group by `project_id` to see which project each row came from. A broad search across every project, such as a `message_body` `like` filter, can be slow, so narrow the time range for those. A project token only reaches its own project, so with project tokens each call queries one project: name it, or omit `project` when only one is configured. A list of several projects returns an error in that mode, since each token would need its own request and percentiles from separate requests can't be combined.
+
+```json
+{ "project": "Backend", "start_time": 1761955200, "granularity": "day", "filters": [{ "field": "environment", "operator": "eq", "values": ["production"] }], "group_by": ["item_counter"], "aggregates": [{ "field": "person_id", "function": "count_distinct", "alias": "people" }], "sort": { "field": "occurrence_count", "order": "desc" }, "limit": 20 }
+```
+
+Which projects logged a message since `start_time`, across every project the token can read:
+
+```json
+{ "start_time": 1761955200, "filters": [{ "field": "message_body", "operator": "like", "values": ["%Successfully deleted%"] }], "group_by": ["project_id", "item_counter"], "sort": { "field": "occurrence_count", "order": "desc" } }
+```
 
 `list-occurrences(counter, limit?, page?, last_id?, max_tokens?, project?)`: Look up the actual occurrences behind a Rollbar item, not just the item summary. Give it the item's counter and it returns the individual instances, each with its own timestamp, environment, and error detail.
 

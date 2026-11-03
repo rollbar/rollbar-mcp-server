@@ -91,3 +91,53 @@ describe("buildProjectParam", () => {
     expect(schema.safeParse(undefined).success).toBe(true);
   });
 });
+
+describe("buildProjectsParam", () => {
+  beforeEach(() => {
+    vi.resetModules();
+  });
+
+  async function build(config: { PROJECTS: unknown[]; HAS_ACCOUNT_TOKEN: boolean }) {
+    vi.doMock("../../../src/config.js", () => config);
+    const { buildProjectsParam } = await import(
+      "../../../src/utils/project-params.js"
+    );
+    return buildProjectsParam();
+  }
+
+  it("accepts one project, a list, or none in account-token mode", async () => {
+    const schema = await build({ PROJECTS: [], HAS_ACCOUNT_TOKEN: true });
+
+    expect(schema.safeParse(undefined).success).toBe(true);
+    expect(schema.safeParse("Backend").success).toBe(true);
+    expect(schema.safeParse(["Backend", "789"]).success).toBe(true);
+    expect(schema.safeParse([]).success).toBe(false);
+  });
+
+  it("accepts a list alongside project tokens when an account token is also configured", async () => {
+    const schema = await build({
+      PROJECTS: [
+        { name: "backend", token: "t1", apiBase: "base" },
+        { name: "frontend", token: "t2", apiBase: "base" },
+      ],
+      HAS_ACCOUNT_TOKEN: true,
+    });
+
+    expect(schema.safeParse(undefined).success).toBe(true);
+    expect(schema.safeParse(["backend", "frontend"]).success).toBe(true);
+  });
+
+  it("requires exactly one configured name when only project tokens are configured", async () => {
+    const schema = await build({
+      PROJECTS: [
+        { name: "backend", token: "t1", apiBase: "base" },
+        { name: "frontend", token: "t2", apiBase: "base" },
+      ],
+      HAS_ACCOUNT_TOKEN: false,
+    });
+
+    expect(schema.safeParse("backend").success).toBe(true);
+    expect(schema.safeParse(undefined).success).toBe(false);
+    expect(schema.safeParse(["backend", "frontend"]).success).toBe(false);
+  });
+});

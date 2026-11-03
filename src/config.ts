@@ -575,6 +575,65 @@ export async function getAccountModeInfo(): Promise<AccountModeInfo> {
   return { active: false };
 }
 
+export interface ProjectScope {
+  token: string;
+  apiBase: string;
+  /**
+   * Projects to restrict the request to. Undefined means no restriction:
+   * every project an account or user token can read, or a project token's
+   * own project.
+   */
+  projectIds?: number[];
+}
+
+/**
+ * Resolves a `project` param that may name several projects, for endpoints
+ * that can query more than one project in a single request (POST
+ * /metrics/occurrences). Pair with buildProjectsParam().
+ *
+ * - One name or id, or a one-entry list: same as resolveAuthContext().
+ * - Omitted: with an account or user token, every project the token can
+ *   read. Otherwise resolveAuthContext()'s single configured project, or its
+ *   "specify a project" error.
+ * - Several: account or user token only, each resolved against the token's
+ *   projects. A project token reaches only its own project.
+ */
+export async function resolveProjectScope(
+  project: string | string[] | undefined,
+): Promise<ProjectScope> {
+  const requested =
+    Array.isArray(project) && project.length === 1 ? project[0] : project;
+
+  if (typeof requested === "string") {
+    const auth = await resolveAuthContext(requested);
+    return {
+      token: auth.token,
+      apiBase: auth.apiBase,
+      projectIds: auth.projectId === undefined ? undefined : [auth.projectId],
+    };
+  }
+
+  const { active, token, apiBase } = await getAccountModeInfo();
+  if (!active || token === undefined || apiBase === undefined) {
+    if (requested === undefined) {
+      const auth = await resolveAuthContext(undefined);
+      return { token: auth.token, apiBase: auth.apiBase };
+    }
+    throw new Error(
+      "Querying several projects at once requires an account or user token. A project token only reaches its own project.",
+    );
+  }
+
+  if (requested === undefined) {
+    return { token, apiBase };
+  }
+
+  const ids = await Promise.all(
+    requested.map((name) => resolveProjectId(token, apiBase, name)),
+  );
+  return { token, apiBase, projectIds: [...new Set(ids)] };
+}
+
 export function getUserAgent(toolName: string): string {
   return `rollbar-mcp-server/${packageJson.version} (tool: ${toolName})`;
 }

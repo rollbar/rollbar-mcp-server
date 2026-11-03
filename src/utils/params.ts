@@ -37,6 +37,39 @@ export function injectProjectIdBodyParam<T extends Record<string, unknown>>(
   return { ...body, project_id: auth.projectId };
 }
 
+export interface ProjectIdsMetricsFilter {
+  field: "project_id";
+  operator: "eq";
+  values: number[];
+}
+
+/**
+ * Appends a `project_id eq <ids>` filter to a metrics query's `filters`
+ * array. No-op (returns `filters` unchanged) when `projectIds` is undefined,
+ * which leaves the API to choose: every project an account or user token can
+ * read, or a project token's own project.
+ *
+ * An empty list still appends its empty filter, which the API refuses for an
+ * account or user token, so a resolution bug fails closed instead of widening
+ * the query to every project.
+ *
+ * Use for: POST /metrics/occurrences (get-occurrence-metrics), with the
+ * `projectIds` from resolveProjectScope().
+ */
+export function injectProjectIdsMetricsFilter<T>(
+  filters: T[],
+  projectIds: number[] | undefined,
+): Array<T | ProjectIdsMetricsFilter> {
+  if (projectIds === undefined) {
+    return filters;
+  }
+
+  return [
+    ...filters,
+    { field: "project_id", operator: "eq", values: [...projectIds] },
+  ];
+}
+
 /**
  * Appends a REPEATED `project_ids=<id>` query param to `url`. This is the
  * one exception in the Rollbar API: GET /items/ (item search / list-items)
