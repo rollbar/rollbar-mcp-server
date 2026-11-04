@@ -197,7 +197,7 @@ describe("get-occurrence-metrics over MCP", () => {
           field: "code_version",
           function: "topk",
           alias: "top_versions",
-          parameters: ["3"],
+          parameters: ["3", "3", "counts"],
         },
       ],
       sort: [{ field: "occurrence_count", order: "desc" }],

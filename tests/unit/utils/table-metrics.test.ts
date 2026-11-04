@@ -1,5 +1,58 @@
 import { describe, expect, it } from "vitest";
-import { escapeMetricsKey } from "../../../src/utils/table-metrics.js";
+import {
+  escapeMetricsKey,
+  groupTopkCounts,
+  topkParameters,
+} from "../../../src/utils/table-metrics.js";
+
+describe("topkParameters", () => {
+  it.each([
+    ["nothing", undefined, ["10", "3", "counts"]],
+    ["an empty list", [], ["10", "3", "counts"]],
+    ["a count", ["5"], ["5", "3", "counts"]],
+    ["a count and load factor", ["5", "10"], ["5", "10", "counts"]],
+    ["counts already present", ["5", "3", "counts"], ["5", "3", "counts"]],
+    ["counts out of place", ["counts", "5"], ["5", "3", "counts"]],
+  ])("always asks for counts given %s", (_label, parameters, expected) => {
+    expect(topkParameters(parameters)).toEqual(expected);
+  });
+
+  it.each([
+    ["three numbers", ["5", "3", "1"]],
+    ["a decimal", ["5.5"]],
+    ["zero", ["0"]],
+    ["a negative number", ["-5"]],
+    ["text", ["five"]],
+  ])("rejects %s", (_label, parameters) => {
+    expect(() => topkParameters(parameters)).toThrow(
+      /topk takes how many values to return/,
+    );
+  });
+});
+
+describe("groupTopkCounts", () => {
+  it("regroups flat (value, count, error) triples in order", () => {
+    expect(
+      groupTopkCounts(["['message', 'level']", "6178", "0", "b", "12", "3"]),
+    ).toEqual([
+      { value: "['message', 'level']", count: 6178, count_error: 0 },
+      { value: "b", count: 12, count_error: 3 },
+    ]);
+  });
+
+  it("returns an empty list for no values", () => {
+    expect(groupTopkCounts([])).toEqual([]);
+  });
+
+  it.each([
+    ["a list that isn't triples", ["a", "b"]],
+    ["triples with a non-numeric count", ["a", "b", "c"]],
+    ["a non-list", "a"],
+    ["null", null],
+  ])("passes %s through unchanged", (_label, value) => {
+    expect(groupTopkCounts(value)).toEqual(value);
+  });
+});
 
 describe("escapeMetricsKey", () => {
   it.each([

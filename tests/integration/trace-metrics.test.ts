@@ -245,10 +245,98 @@ describe("get-trace-metrics over MCP", () => {
         key: "json.type",
         function: "topk",
         alias: "event_types",
-        parameters: ["5"],
+        parameters: ["5", "3", "counts"],
       },
     ]);
   });
+
+  it("asks topk for counts and returns each value with its count", async () => {
+    useAccountToken();
+    // Shaped like a live response: the API flattens topK's (value, count,
+    // error) tuples into one list of strings.
+    fetchMock.mockResolvedValueOnce(
+      ok({
+        timepoints: [
+          {
+            timestamp: 1793802988,
+            metrics_rows: [
+              [
+                {
+                  field: "event_names",
+                  value: [
+                    "rollbar-network-event",
+                    "831406",
+                    "0",
+                    "rollbar-focus-event",
+                    "127323",
+                    "2",
+                  ],
+                },
+                // An array aggregate whose length is a multiple of three
+                // stays as it is.
+                { field: "replay_ids", value: ["a1", "b2", "c3"] },
+                { field: "span_count", value: "1104979" },
+              ],
+            ],
+          },
+        ],
+      }),
+    );
+    await connect();
+
+    const result = await call({
+      aggregates: [
+        { field: "events_name", function: "topk", alias: "event_names" },
+        {
+          field: "attributes",
+          key: "rollbar.replay.id",
+          function: "array",
+          alias: "replay_ids",
+        },
+      ],
+    });
+
+    expect(result.isError).toBeFalsy();
+    expect(lastRequest().body.aggregates[0]).toEqual({
+      field: "events_name",
+      function: "topk",
+      alias: "event_names",
+      parameters: ["10", "3", "counts"],
+    });
+    expect(JSON.parse(result.text).timepoints[0].rows).toEqual([
+      {
+        event_names: [
+          { value: "rollbar-network-event", count: 831406, count_error: 0 },
+          { value: "rollbar-focus-event", count: 127323, count_error: 2 },
+        ],
+        replay_ids: ["a1", "b2", "c3"],
+        span_count: 1104979,
+      },
+    ]);
+  });
+
+  it.each([
+    ["more than two numbers", ["5", "3", "1"]],
+    ["a non-integer", ["5.5"]],
+    ["zero", ["0"]],
+    ["SQL", ["5) as x, version() as y, topK(5"]],
+  ])(
+    "rejects topk parameters with %s before any request",
+    async (_label, parameters) => {
+      useAccountToken();
+      await connect();
+
+      const result = await call({
+        aggregates: [
+          { field: "name", function: "topk", alias: "names", parameters },
+        ],
+      });
+
+      expect(result.isError).toBe(true);
+      expect(result.text).toMatch(/topk takes how many values to return/);
+      expect(fetchMock).not.toHaveBeenCalled();
+    },
+  );
 
   it("sends one project filter for a list of projects", async () => {
     useAccountToken([project, otherProject]);

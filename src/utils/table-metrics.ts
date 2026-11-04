@@ -59,6 +59,14 @@ const MAX_LIMIT = 1000;
 // certainly a millisecond timestamp.
 const MAX_UNIX_SECONDS = 9_999_999_999;
 
+// ClickHouse's topK defaults: how many values to return, and the load factor
+// that sizes its sketch (count × load factor cells). The API quotes "counts"
+// into topK's third argument, which makes ClickHouse return (value, count,
+// error) tuples instead of bare values.
+const TOPK_DEFAULT_COUNT = "10";
+const TOPK_DEFAULT_LOAD_FACTOR = "3";
+const TOPK_COUNTS = "counts";
+
 // About 20k tokens, the same default budget as list-occurrences. An array
 // aggregate can return megabytes (one replay's recording events are several),
 // which would flood the conversation or be cut off by the client.
@@ -138,22 +146,72 @@ function toApiKey<T extends KeyedEntry>({
     : { ...rest, key: escapeMetricsKey(key, path) };
 }
 
+/**
+ * Builds topk's parameters so the API always returns counts: [count, load
+ * factor, "counts"]. Takes [], [count] or [count, load factor], with or
+ * without "counts", and fills in ClickHouse's defaults. The API writes these
+ * into the SQL unquoted, so anything but a positive integer is rejected.
+ */
+export function topkParameters(parameters: string[] = []): string[] {
+  const args = parameters.filter((parameter) => parameter !== TOPK_COUNTS);
+  if (args.length > 2 || !args.every((arg) => /^[1-9]\d*$/.test(arg))) {
+    throw new Error(
+      "topk takes how many values to return and an optional load factor, both positive integers, such as ['5'] or ['5', '10'].",
+    );
+  }
+  const [count = TOPK_DEFAULT_COUNT, loadFactor = TOPK_DEFAULT_LOAD_FACTOR] =
+    args;
+  return [count, loadFactor, TOPK_COUNTS];
+}
+
+export interface TopkEntry {
+  value: unknown;
+  count: number;
+  // How far count may overstate the true count; 0 when it's exact.
+  count_error: number;
+}
+
+/**
+ * The API flattens topK's (value, count, error) tuples into one list:
+ * [value1, count1, error1, value2, ...], most frequent first. This regroups it
+ * into one object per value, in the same order. A value of any other shape
+ * passes through unchanged.
+ */
+export function groupTopkCounts(value: unknown): unknown {
+  if (!Array.isArray(value) || value.length % 3 !== 0) {
+    return value;
+  }
+  const entries: TopkEntry[] = [];
+  for (let i = 0; i < value.length; i += 3) {
+    const count = Number(value[i + 1]);
+    const countError = Number(value[i + 2]);
+    if (Number.isNaN(count) || Number.isNaN(countError)) {
+      return value;
+    }
+    entries.push({ value: value[i], count, count_error: countError });
+  }
+  return entries;
+}
+
 export function registerTableMetricsTool(
   server: McpServer,
   config: TableMetricsToolConfig,
 ) {
   const { countField } = config;
 
-  // The traces table returns its count as a numeric string; the occurrences
-  // table already returns a number.
-  function flattenRow(row: RollbarMetricsColumn[]): Record<string, unknown> {
+  function flattenRow(
+    row: RollbarMetricsColumn[],
+    topkAliases: ReadonlySet<string>,
+  ): Record<string, unknown> {
     return Object.fromEntries(
-      row.map(({ field, value }) => [
-        field,
-        field === countField && typeof value === "string" && value !== ""
-          ? Number(value)
-          : value,
-      ]),
+      row.map(({ field, value }) => {
+        // The traces table returns its count as a numeric string; the
+        // occurrences table already returns a number.
+        if (field === countField && typeof value === "string" && value !== "") {
+          return [field, Number(value)];
+        }
+        return [field, topkAliases.has(field) ? groupTopkCounts(value) : value];
+      }),
     );
   }
 
@@ -233,13 +291,13 @@ export function registerTableMetricsTool(
                 .array(z.string())
                 .optional()
                 .describe(
-                  "Function arguments as strings: topk takes a count, such as ['5']; quantiles takes an accuracy then levels, such as ['1000', '0.5', '0.9'].",
+                  "Function arguments as strings: topk takes how many values to return (default 10) and an optional load factor (default 3; higher is more accurate and uses more memory), such as ['5'] or ['5', '10']; quantiles takes an accuracy then levels, such as ['1000', '0.5', '0.9'].",
                 ),
             }),
           )
           .optional()
           .describe(
-            "Aggregates computed per group, such as count_distinct of a column.",
+            "Aggregates computed per group, such as count_distinct of a column. topk returns the most frequent values first, each as {value, count, count_error}: values are strings, and count_error is how far count may overstate the true count (0 when it's exact).",
           ),
         sort: z
           .union([sortSchema(), z.array(sortSchema()).min(1)])
@@ -309,7 +367,18 @@ export function registerTableMetricsTool(
         ...toApiKey(filter),
         values: filter.values ?? [],
       }));
-      const apiAggregates = aggregates?.map(toApiKey);
+      const apiAggregates = aggregates?.map((aggregate) =>
+        toApiKey(
+          aggregate.function === "topk"
+            ? { ...aggregate, parameters: topkParameters(aggregate.parameters) }
+            : aggregate,
+        ),
+      );
+      const topkAliases = new Set(
+        aggregates
+          ?.filter((aggregate) => aggregate.function === "topk")
+          .map((aggregate) => aggregate.alias),
+      );
 
       const scope = await resolveProjectScope(project);
       const body = {
@@ -350,7 +419,9 @@ export function registerTableMetricsTool(
         .filter((timepoint) => timepoint.metrics_rows.length > 0)
         .map((timepoint) => ({
           timestamp: timepoint.timestamp,
-          rows: timepoint.metrics_rows.map(flattenRow),
+          rows: timepoint.metrics_rows.map((row) =>
+            flattenRow(row, topkAliases),
+          ),
         }));
       const rowCount = timepoints.reduce(
         (total, timepoint) => total + timepoint.rows.length,
