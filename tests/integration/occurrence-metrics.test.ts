@@ -235,6 +235,49 @@ describe("get-occurrence-metrics over MCP", () => {
     });
   });
 
+  it("takes keys literally, escaping their dots, and reads a path inside the value", async () => {
+    useAccountToken();
+    fetchMock.mockResolvedValueOnce(ok(metrics));
+    await connect();
+
+    const result = await call({
+      filters: [
+        {
+          field: "customs",
+          key: "job.name",
+          operator: "eq",
+          values: ["DeleteReplaysByPerson"],
+        },
+      ],
+      aggregates: [
+        {
+          field: "customs",
+          key: "timings",
+          path: "execution_duration",
+          function: "max",
+          alias: "max_duration",
+        },
+      ],
+    });
+
+    expect(result.isError).toBeFalsy();
+    const { body } = lastRequest();
+    expect(body.filters[0]).toEqual({
+      field: "customs",
+      key: "job\\.name",
+      operator: "eq",
+      values: ["DeleteReplaysByPerson"],
+    });
+    expect(body.aggregates).toEqual([
+      {
+        field: "customs",
+        key: "timings.execution_duration",
+        function: "max",
+        alias: "max_duration",
+      },
+    ]);
+  });
+
   it("sends only the default limit and offset for an empty query", async () => {
     useAccountToken("ROLLBAR_USER_ACCESS_TOKEN");
     fetchMock.mockResolvedValueOnce(ok({ timepoints: [], query_execution: 0 }));

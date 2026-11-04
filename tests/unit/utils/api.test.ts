@@ -229,7 +229,10 @@ describe('api utilities', () => {
         ).rejects.toThrow(/write scope/);
       });
 
-      it('adds a Metrics API plan hint on 403 for get-occurrence-metrics', async () => {
+      it.each([
+        ['get-occurrence-metrics', 'occurrences'],
+        ['get-trace-metrics', 'traces'],
+      ])('adds a Metrics API plan hint on 403 for %s', async (toolName, table) => {
         fetchMock.mockResolvedValueOnce({
           ok: false,
           status: 403,
@@ -238,7 +241,7 @@ describe('api utilities', () => {
         });
 
         await expect(
-          makeRollbarRequest('https://api.rollbar.com/api/1/metrics/occurrences', 'get-occurrence-metrics', 'test-token')
+          makeRollbarRequest(`https://api.rollbar.com/api/1/metrics/${table}`, toolName, 'test-token')
         ).rejects.toThrow(/Advanced package/);
       });
 

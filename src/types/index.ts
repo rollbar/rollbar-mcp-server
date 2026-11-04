@@ -218,13 +218,14 @@ export interface RollbarMetricsColumn {
   value: unknown;
 }
 
-export interface RollbarOccurrenceMetricsTimepoint {
+export interface RollbarMetricsTimepoint {
   timestamp: number;
   metrics_rows: RollbarMetricsColumn[][];
 }
 
-export interface RollbarOccurrenceMetricsResponse {
-  timepoints: RollbarOccurrenceMetricsTimepoint[];
+// Response of POST /metrics/occurrences and POST /metrics/traces.
+export interface RollbarTableMetricsResponse {
+  timepoints: RollbarMetricsTimepoint[];
   // Absent when the query matched no rows.
   last_occurrence_timestamp?: number;
   query_execution?: number;
