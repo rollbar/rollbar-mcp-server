@@ -129,6 +129,52 @@ function toApiKey<T extends KeyedEntry>({
     : { ...rest, key: escapeMetricsKey(key, path) };
 }
 
+// Why an aggregate alias would overwrite a field the row already has, if it
+// would.
+function rowFieldConflict(
+  alias: string,
+  countField: string,
+  groupBy: string[] | undefined,
+): string | undefined {
+  if (alias === countField) {
+    return `every row already has ${countField}`;
+  }
+  if (alias === "project_slug") {
+    return "rows grouped by project_id already have project_slug";
+  }
+  if (groupBy?.includes(alias)) {
+    return `${alias} is also a group_by column`;
+  }
+  return undefined;
+}
+
+// Each row is flattened into one object keyed by field name, so an aggregate
+// alias that repeats, or names a field the row already has, would overwrite a
+// value. The API rejects or fails most such queries itself, but it appends
+// project_slug after the aggregates, which would silently replace one.
+function checkAliases(
+  aliases: string[],
+  countField: string,
+  groupBy: string[] | undefined,
+): void {
+  const seen = new Set<string>();
+  for (const alias of aliases) {
+    if (seen.has(alias)) {
+      throw new Error(
+        `The alias "${alias}" is used by more than one aggregate. Give each aggregate its own alias.`,
+      );
+    }
+    seen.add(alias);
+
+    const conflict = rowFieldConflict(alias, countField, groupBy);
+    if (conflict) {
+      throw new Error(
+        `The alias "${alias}" would overwrite a field in each row: ${conflict}. Choose another alias.`,
+      );
+    }
+  }
+}
+
 function flattenRow(
   row: RollbarMetricsColumn[],
   countField: string,
@@ -323,6 +369,12 @@ export function registerGetMetricsTool(server: McpServer) {
           `${countField} can't be used as a sort field. Add a count_all aggregate with an alias, such as {"field": "span_id", "function": "count_all", "alias": "spans"}, and sort on the alias.`,
         );
       }
+
+      checkAliases(
+        aggregates?.map((aggregate) => aggregate.alias) ?? [],
+        countField,
+        group_by,
+      );
 
       // Validate keys and paths before resolving projects, which can make a
       // request of its own.

@@ -509,6 +509,60 @@ describe("get-metrics on the occurrences table over MCP", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it.each([
+    [
+      "a repeated alias",
+      {
+        aggregates: [
+          { field: "person_id", function: "count_distinct", alias: "n" },
+          { field: "ip_address", function: "count_distinct", alias: "n" },
+        ],
+      },
+      /"n" is used by more than one aggregate/,
+    ],
+    [
+      "the count column as an alias",
+      {
+        aggregates: [
+          { field: "person_id", function: "count_all", alias: "occurrence_count" },
+        ],
+      },
+      /every row already has occurrence_count/,
+    ],
+    [
+      "project_slug as an alias",
+      {
+        group_by: ["project_id"],
+        aggregates: [
+          { field: "person_id", function: "count_distinct", alias: "project_slug" },
+        ],
+      },
+      /rows grouped by project_id already have project_slug/,
+    ],
+    [
+      "a group_by column as an alias",
+      {
+        group_by: ["environment"],
+        aggregates: [
+          { field: "environment", function: "max", alias: "environment" },
+        ],
+      },
+      /environment is also a group_by column/,
+    ],
+  ])(
+    "rejects %s, which would overwrite a row field, before any request",
+    async (_label, args, message) => {
+      useAccountToken();
+      await connect();
+
+      const result = await call(args);
+
+      expect(result.isError).toBe(true);
+      expect(result.text).toMatch(message);
+      expect(fetchMock).not.toHaveBeenCalled();
+    },
+  );
+
   it("suggests a limit that fits when the result is over the size limit", async () => {
     useAccountToken();
     const row = (counter: number) => [

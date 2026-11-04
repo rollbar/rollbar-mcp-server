@@ -367,6 +367,21 @@ describe("get-metrics on the traces table over MCP", () => {
     },
   );
 
+  it("rejects span_count as an alias before any request", async () => {
+    useAccountToken();
+    await connect();
+
+    const result = await call({
+      aggregates: [
+        { field: "span_id", function: "count_all", alias: "span_count" },
+      ],
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result.text).toMatch(/every row already has span_count/);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it.each([
     [
       "a filter",
