@@ -10,8 +10,7 @@ import { registerListProjectsTool } from "./list-projects.js";
 import { registerListOccurrencesTool } from "./list-occurrences.js";
 import { registerListItemEventsTool } from "./list-item-events.js";
 import { registerPostItemCommentTool } from "./post-item-comment.js";
-import { registerGetOccurrenceMetricsTool } from "./get-occurrence-metrics.js";
-import { registerGetTraceMetricsTool } from "./get-trace-metrics.js";
+import { registerGetMetricsTool } from "./get-metrics.js";
 
 export function registerAllTools(server: McpServer) {
   registerGetItemDetailsTool(server);
@@ -25,6 +24,5 @@ export function registerAllTools(server: McpServer) {
   registerListOccurrencesTool(server);
   registerListItemEventsTool(server);
   registerPostItemCommentTool(server);
-  registerGetOccurrenceMetricsTool(server);
-  registerGetTraceMetricsTool(server);
+  registerGetMetricsTool(server);
 }

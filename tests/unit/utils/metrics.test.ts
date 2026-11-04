@@ -3,7 +3,7 @@ import {
   escapeMetricsKey,
   groupTopkCounts,
   topkParameters,
-} from "../../../src/utils/table-metrics.js";
+} from "../../../src/utils/metrics.js";
 
 describe("topkParameters", () => {
   it.each([
@@ -83,5 +83,11 @@ describe("escapeMetricsKey", () => {
     expect(
       escapeMetricsKey("rollbar.replay.trigger.context", "rule.type"),
     ).toBe("rollbar\\.replay\\.trigger\\.context.rule.type");
+  });
+
+  it("drops a leading '$.' from the path, which the API adds itself", () => {
+    expect(escapeMetricsKey("timings", "$.execution_duration")).toBe(
+      "timings.execution_duration",
+    );
   });
 });

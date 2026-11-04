@@ -4,10 +4,10 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { CallToolResultSchema } from "@modelcontextprotocol/sdk/types.js";
 
-// get-trace-metrics shares its implementation with get-occurrence-metrics,
-// whose tests cover the request, paging, project selection and error handling
-// in depth. These cover what differs for the traces table, and that the
-// shared behavior reaches it.
+// get-metrics takes the same request for both tables. The occurrences tests
+// cover the request, paging, project selection and error handling in depth.
+// These cover what differs for the traces table, and that the shared behavior
+// reaches it.
 vi.mock("dotenv", () => ({ default: { config: vi.fn() } }));
 vi.mock("node:fs", () => ({ existsSync: () => false, readFileSync: vi.fn() }));
 
@@ -43,7 +43,7 @@ function ok(result: unknown) {
   return new Response(JSON.stringify({ err: 0, result }), { status: 200 });
 }
 
-describe("get-trace-metrics over MCP", () => {
+describe("get-metrics on the traces table over MCP", () => {
   let client: Client;
   let server: McpServer;
   let fetchMock: ReturnType<typeof vi.fn>;
@@ -89,7 +89,10 @@ describe("get-trace-metrics over MCP", () => {
 
   async function call(args: Record<string, unknown>) {
     const result = CallToolResultSchema.parse(
-      await client.callTool({ name: "get-trace-metrics", arguments: args }),
+      await client.callTool({
+        name: "get-metrics",
+        arguments: { table: "traces", ...args },
+      }),
     );
     const text = result.content.find((entry) => entry.type === "text")?.text;
     expect(typeof text).toBe("string");
@@ -100,17 +103,6 @@ describe("get-trace-metrics over MCP", () => {
     const [url, options] = fetchMock.mock.calls.at(-1)!;
     return { url, options, body: JSON.parse(options.body) };
   }
-
-  it("advertises the tool as read-only", async () => {
-    vi.stubEnv("ROLLBAR_ACCOUNT_ACCESS_TOKEN", "account-token");
-    await connect();
-    const { tools } = await client.listTools();
-    expect(
-      tools.find((tool) => tool.name === "get-trace-metrics")?.annotations
-        ?.readOnlyHint,
-    ).toBe(true);
-    expect(fetchMock).not.toHaveBeenCalled();
-  });
 
   it("posts to the traces table with escaped attribute keys and returns span_count as a number", async () => {
     useAccountToken();
@@ -145,7 +137,7 @@ describe("get-trace-metrics over MCP", () => {
         },
         { field: "start_time", function: "min", alias: "first_start" },
       ],
-      sort: { field: "first_start", order: "desc" },
+      sort: [{ field: "first_start", order: "desc" }],
       limit: 10,
     });
 
@@ -181,7 +173,7 @@ describe("get-trace-metrics over MCP", () => {
         },
         { field: "start_time", function: "min", alias: "first_start" },
       ],
-      sort: { field: "first_start", order: "desc" },
+      sort: [{ field: "first_start", order: "desc" }],
       limit: 10,
       offset: 0,
     });
@@ -201,7 +193,7 @@ describe("get-trace-metrics over MCP", () => {
           ],
         },
       ],
-      last_occurrence_timestamp: 1793799662,
+      last_timestamp: 1793799662,
       row_count: 1,
     });
   });
@@ -352,9 +344,9 @@ describe("get-trace-metrics over MCP", () => {
   });
 
   it.each([
-    ["a single sort", { field: "span_count", order: "desc" }],
+    ["the only sort", [{ field: "span_count", order: "desc" }]],
     [
-      "a list of sorts",
+      "a later sort",
       [
         { field: "first_start", order: "desc" },
         { field: "span_count", order: "desc" },
@@ -402,7 +394,7 @@ describe("get-trace-metrics over MCP", () => {
     },
   );
 
-  it("refuses a result over the size limit and points to get-replay", async () => {
+  it("refuses a row over the size limit and points to get-replay", async () => {
     useAccountToken();
     const events = "x".repeat(90_000);
     fetchMock.mockResolvedValueOnce(
@@ -434,6 +426,7 @@ describe("get-trace-metrics over MCP", () => {
 
     expect(result.isError).toBe(true);
     expect(result.text).toMatch(/over this tool's 80000-character limit/);
+    expect(result.text).toMatch(/Even one row is over the limit/);
     expect(result.text).toMatch(/use get-replay/);
   });
 

@@ -589,7 +589,7 @@ export interface ProjectScope {
 /**
  * Resolves a `project` param that may name several projects, for endpoints
  * that can query more than one project in a single request (POST
- * /metrics/occurrences). Pair with buildProjectsParam().
+ * /metrics/<table>). Pair with buildProjectsParam().
  *
  * - One name or id, or a one-entry list: same as resolveAuthContext().
  * - Omitted: with an account or user token, every project the token can
