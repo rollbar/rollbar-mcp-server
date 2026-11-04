@@ -28,6 +28,9 @@ interface TableConfig {
   countFieldSortable: boolean;
   // Appended to the error for a response over MAX_RESPONSE_CHARS.
   oversizeHint?: string;
+  // Result names the API formats as hex IDs. It picks the format by the
+  // result's name, so it would also apply to an aggregate aliased this way.
+  hexIdNames?: readonly string[];
 }
 
 const TABLES: Record<MetricsTable, TableConfig> = {
@@ -38,6 +41,7 @@ const TABLES: Record<MetricsTable, TableConfig> = {
     // span_count as a sort field.
     countFieldSortable: false,
     oversizeHint: "To read a replay's recording, use get-replay.",
+    hexIdNames: ["session_id", "trace_id", "span_id", "parent_span_id"],
   },
 };
 
@@ -95,7 +99,7 @@ const MAX_RESPONSE_CHARS = 80_000;
 const DESCRIPTION =
   "Count and aggregate Rollbar occurrences or trace spans over a time range with the Metrics API: filter, group, aggregate, and optionally bucket into timepoints by granularity. Requires the account's Advanced package (otherwise 403). Each row holds its group_by columns, aggregate aliases, and its count (occurrence_count or span_count). With an account or user token, omit project to query every readable project, or pass a list; group_by project_id to break rows down by project. Default order is timestamp ascending. " +
   "Table occurrences (errors and messages). Common columns: item_counter, item_id, item_title, item_level, item_status, environment, code_version, framework, platform, language, browser_family, browser_version, os_family, os_version, device_model, person_id, person_email, ip_address, server_host, request_url, request_method, exception_class, exception_message, message_body, context, fingerprint, scm_branch. Key/value columns: request_headers, request_params, request_gets, request_posts, customs, traceframe_locals, attributes. For top-N, sort by occurrence_count desc. A like filter across every project can be slow, so narrow the time range. " +
-  "Table traces (session replays and their telemetry, as OpenTelemetry spans named 'rrweb-replay-recording' and 'rollbar-telemetry', linked by session_id and the rollbar.replay.id attribute). Columns: project_id, environment, name, kind, session_id, trace_id, span_id (ids are hex strings), start_time (the time range applies to it), duration (ns); parent_id is unavailable. Key/value columns: attributes, events_attributes. Replay attributes include rollbar.replay.trigger.type, rollbar.replay.url.full, rollbar.occurrence.uuids (a JSON array), user.id, user.email and client.address, so results can hold personal data. span_count can't be sorted on: sort on a count_all alias. Rows can't be grouped by an attribute: use topk on it. An aggregate other than array on an event column (events_name, events_time, events_attributes_name, events_attributes_value) counts once per event and inflates every count in the row, so query event columns separately. To read a recording, use get-replay. " +
+  "Table traces (session replays and their telemetry, as OpenTelemetry spans named 'rrweb-replay-recording' and 'rollbar-telemetry', linked by session_id and the rollbar.replay.id attribute). Columns: project_id, environment, name, kind, session_id, trace_id, span_id (hex strings when grouped by or filtered on; an aggregate over one returns decimal strings, which filters can't use), start_time (the time range applies to it), duration (ns); parent_id is unavailable. Key/value columns: attributes, events_attributes. Replay attributes include rollbar.replay.trigger.type, rollbar.replay.url.full, rollbar.occurrence.uuids (a JSON array), user.id, user.email and client.address, so results can hold personal data. span_count can't be sorted on: sort on a count_all alias. Rows can't be grouped by an attribute: use topk on it. An aggregate other than array on an event column (events_name, events_time, events_attributes_name, events_attributes_value) counts once per event and inflates every count in the row, so query event columns separately. To read a recording, use get-replay. " +
   'Example, the 10 most recent replays with the inputs get-replay needs: {"table": "traces", "filters": [{"field": "name", "operator": "eq", "values": ["rrweb-replay-recording"]}], "group_by": ["session_id", "environment"], "aggregates": [{"field": "attributes", "key": "rollbar.replay.id", "function": "array", "alias": "replay_ids"}, {"field": "start_time", "function": "min", "alias": "first_start"}], "sort": [{"field": "first_start", "order": "desc"}], "limit": 10}';
 
 // These build a fresh schema per use: a zod instance used twice becomes a
@@ -129,21 +133,24 @@ function toApiKey<T extends KeyedEntry>({
     : { ...rest, key: escapeMetricsKey(key, path) };
 }
 
-// Why an aggregate alias would overwrite a field the row already has, if it
-// would.
-function rowFieldConflict(
+// Why an aggregate alias can't be used, if it can't: it would overwrite a
+// field the row already has, or the API would format its values as hex IDs.
+function aliasConflict(
   alias: string,
-  countField: string,
+  { countField, hexIdNames = [] }: TableConfig,
   groupBy: string[] | undefined,
 ): string | undefined {
   if (alias === countField) {
     return `every row already has ${countField}`;
   }
-  if (alias === "project_slug") {
+  if (alias === "project_slug" && groupBy?.includes("project_id")) {
     return "rows grouped by project_id already have project_slug";
   }
   if (groupBy?.includes(alias)) {
     return `${alias} is also a group_by column`;
+  }
+  if (hexIdNames.includes(alias)) {
+    return `the API formats any value named ${alias} as a hex ID, which would garble this aggregate's values`;
   }
   return undefined;
 }
@@ -151,10 +158,12 @@ function rowFieldConflict(
 // Each row is flattened into one object keyed by field name, so an aggregate
 // alias that repeats, or names a field the row already has, would overwrite a
 // value. The API rejects or fails most such queries itself, but it appends
-// project_slug after the aggregates, which would silently replace one.
+// project_slug after the aggregates, which would silently replace one. On
+// traces, it also formats any result named after an ID column as hex, which
+// would garble an aggregate's values, counts included.
 function checkAliases(
   aliases: string[],
-  countField: string,
+  table: TableConfig,
   groupBy: string[] | undefined,
 ): void {
   const seen = new Set<string>();
@@ -166,10 +175,10 @@ function checkAliases(
     }
     seen.add(alias);
 
-    const conflict = rowFieldConflict(alias, countField, groupBy);
+    const conflict = aliasConflict(alias, table, groupBy);
     if (conflict) {
       throw new Error(
-        `The alias "${alias}" would overwrite a field in each row: ${conflict}. Choose another alias.`,
+        `The alias "${alias}" can't be used: ${conflict}. Choose another alias.`,
       );
     }
   }
@@ -260,7 +269,7 @@ export function registerGetMetricsTool(server: McpServer) {
                   "item_status and item_level match by name, such as 'error'. Trace ids match as hex strings.",
                 ),
               key: optionalText(
-                "Entry name in a key/value column, taken literally (dots included), such as 'User-Agent' or 'rollbar.replay.id'.",
+                "Entry name in a key/value column, such as 'User-Agent' or 'rollbar.replay.id'. Dots are literal; matching ignores case, and _ matches any character.",
               ),
               path: optionalText(
                 "JSONPath inside the entry's value, such as 'user.id'. Requires key.",
@@ -349,7 +358,8 @@ export function registerGetMetricsTool(server: McpServer) {
       offset,
       project,
     }) => {
-      const { countField, countFieldSortable, oversizeHint } = TABLES[table];
+      const tableConfig = TABLES[table];
+      const { countField, countFieldSortable, oversizeHint } = tableConfig;
 
       // The project parameter is the one way to choose projects. The API
       // ignores a project_id filter on a project token and intersects it with
@@ -372,7 +382,7 @@ export function registerGetMetricsTool(server: McpServer) {
 
       checkAliases(
         aggregates?.map((aggregate) => aggregate.alias) ?? [],
-        countField,
+        tableConfig,
         group_by,
       );
 

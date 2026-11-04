@@ -367,20 +367,39 @@ describe("get-metrics on the traces table over MCP", () => {
     },
   );
 
-  it("rejects span_count as an alias before any request", async () => {
-    useAccountToken();
-    await connect();
+  it.each([
+    ["span_count", "span_id", "count_all", /every row already has span_count/],
+    // The API formats any result named after an ID column as hex, so a topk
+    // aliased this way would come back with hex-formatted counts.
+    ["span_id", "name", "topk", /formats any value named span_id as a hex ID/],
+    [
+      "session_id",
+      "attributes",
+      "count_distinct",
+      /formats any value named session_id as a hex ID/,
+    ],
+  ])(
+    "rejects %s as an alias before any request",
+    async (alias, field, aggregateFunction, message) => {
+      useAccountToken();
+      await connect();
 
-    const result = await call({
-      aggregates: [
-        { field: "span_id", function: "count_all", alias: "span_count" },
-      ],
-    });
+      const result = await call({
+        aggregates: [
+          {
+            field,
+            ...(field === "attributes" ? { key: "user.id" } : {}),
+            function: aggregateFunction,
+            alias,
+          },
+        ],
+      });
 
-    expect(result.isError).toBe(true);
-    expect(result.text).toMatch(/every row already has span_count/);
-    expect(fetchMock).not.toHaveBeenCalled();
-  });
+      expect(result.isError).toBe(true);
+      expect(result.text).toMatch(message);
+      expect(fetchMock).not.toHaveBeenCalled();
+    },
+  );
 
   it.each([
     [

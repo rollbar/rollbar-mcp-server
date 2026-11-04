@@ -563,6 +563,21 @@ describe("get-metrics on the occurrences table over MCP", () => {
     },
   );
 
+  it("accepts project_slug as an alias when not grouping by project_id", async () => {
+    useAccountToken();
+    fetchMock.mockResolvedValueOnce(ok(metrics));
+    await connect();
+
+    const result = await call({
+      aggregates: [
+        { field: "person_id", function: "count_distinct", alias: "project_slug" },
+      ],
+    });
+
+    expect(result.isError).toBeFalsy();
+    expect(lastRequest().body.aggregates[0].alias).toBe("project_slug");
+  });
+
   it("suggests a limit that fits when the result is over the size limit", async () => {
     useAccountToken();
     const row = (counter: number) => [
