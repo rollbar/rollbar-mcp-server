@@ -628,8 +628,22 @@ export async function resolveProjectScope(
     return { token, apiBase };
   }
 
+  // A list is one request on the account token, so each entry is matched
+  // against the projects that token can read. A configured project-token
+  // name only matches when it's also the project's Rollbar name, even though
+  // the same name works on its own (it then uses its project token).
   const ids = await Promise.all(
-    requested.map((name) => resolveProjectId(token, apiBase, name)),
+    requested.map((name) =>
+      resolveProjectId(token, apiBase, name).catch((error: unknown) => {
+        if (!PROJECTS.some((p) => p.name === name)) {
+          throw error;
+        }
+        const reason = error instanceof Error ? error.message : String(error);
+        throw new Error(
+          `${reason}. "${name}" is a configured project-token name, which can't be combined with other projects in one query: in a list, use each project's Rollbar name or id.`,
+        );
+      }),
+    ),
   );
   return { token, apiBase, projectIds: [...new Set(ids)] };
 }

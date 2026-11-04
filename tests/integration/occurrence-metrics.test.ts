@@ -357,6 +357,45 @@ describe("get-occurrence-metrics over MCP", () => {
     });
   });
 
+  describe("project selection with project tokens and an account token", () => {
+    function useBothTokens() {
+      vi.stubEnv("ROLLBAR_ACCESS_TOKEN", "project-token");
+      vi.stubEnv("ROLLBAR_ACCOUNT_ACCESS_TOKEN", "account-token");
+    }
+
+    it("uses a configured project's own token when it's named alone", async () => {
+      useBothTokens();
+      fetchMock.mockResolvedValueOnce(ok(metrics));
+      await connect();
+
+      const result = await call({ project: "default" });
+
+      expect(result.isError).toBeFalsy();
+      const { options, body } = lastRequest();
+      expect(options.headers["X-Rollbar-Access-Token"]).toBe("project-token");
+      expect(body.filters).toEqual([]);
+    });
+
+    it("explains that a list needs Rollbar names, not configured names", async () => {
+      useBothTokens();
+      // The account token lists its projects, then refreshes the list once
+      // after "default" misses.
+      fetchMock.mockResolvedValueOnce(ok([project, otherProject]));
+      fetchMock.mockResolvedValueOnce(ok([project, otherProject]));
+      await connect();
+
+      const result = await call({ project: ["default", "Backend"] });
+
+      expect(result.isError).toBe(true);
+      expect(result.text).toMatch(/Unknown project "default"/);
+      expect(result.text).toMatch(
+        /"default" is a configured project-token name/,
+      );
+      expect(result.text).toMatch(/use each project's Rollbar name or id/);
+      expect(metricsCalls()).toHaveLength(0);
+    });
+  });
+
   it("leaves the project filter to the API on a project token", async () => {
     useProjectToken();
     fetchMock.mockResolvedValueOnce(ok(metrics));
