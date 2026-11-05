@@ -212,3 +212,21 @@ export interface RollbarItemCommentResponse {
   via_api: boolean;
   [key: string]: unknown;
 }
+
+export interface RollbarMetricsColumn {
+  field: string;
+  value: unknown;
+}
+
+export interface RollbarOccurrenceMetricsTimepoint {
+  timestamp: number;
+  metrics_rows: RollbarMetricsColumn[][];
+}
+
+export interface RollbarOccurrenceMetricsResponse {
+  timepoints: RollbarOccurrenceMetricsTimepoint[];
+  // Absent when the query matched no rows.
+  last_occurrence_timestamp?: number;
+  query_execution?: number;
+  [key: string]: unknown;
+}

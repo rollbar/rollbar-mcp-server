@@ -229,6 +229,19 @@ describe('api utilities', () => {
         ).rejects.toThrow(/write scope/);
       });
 
+      it('adds a Metrics API plan hint on 403 for get-occurrence-metrics', async () => {
+        fetchMock.mockResolvedValueOnce({
+          ok: false,
+          status: 403,
+          statusText: 'Forbidden',
+          text: vi.fn().mockResolvedValueOnce('')
+        });
+
+        await expect(
+          makeRollbarRequest('https://api.rollbar.com/api/1/metrics/occurrences', 'get-occurrence-metrics', 'test-token')
+        ).rejects.toThrow(/Advanced package/);
+      });
+
       it('adds a generic insufficient-privileges hint on 403 for other tools', async () => {
         fetchMock.mockResolvedValueOnce({
           ok: false,
