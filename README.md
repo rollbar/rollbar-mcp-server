@@ -91,7 +91,7 @@ If a config file exists but is invalid, the server exits with an error instead o
 
 Required scopes:
 
-- Read-only tools (`get-item-details`, `get-deployments`, `get-version`, `get-top-items`, `list-items`, `get-replay`, `list-projects`, `list-occurrences`, `list-item-events`, `get-occurrence-metrics`) work with a **read**-scope account or user token, subject to project permissions. `get-occurrence-metrics` also requires the account's Advanced package.
+- Read-only tools (`get-item-details`, `get-deployments`, `get-version`, `get-top-items`, `list-items`, `get-replay`, `list-projects`, `list-occurrences`, `list-item-events`, `get-metrics`) work with a **read**-scope account or user token, subject to project permissions. `get-metrics` also requires the account's Advanced package.
 - `update-item` requires an account token with **both read and write** scope: every account-token call resolves the target project via `GET /projects` first (read), then makes the `PATCH` request (write). A write-only token will fail at the project-resolution step before ever reaching the update.
 - As with project tokens, prefer a read-scope token unless you specifically need `update-item`.
 - `post-item-comment` requires a **user** token with **read and write** scope and project **comment** permission.
@@ -114,22 +114,62 @@ If the server detects only `ROLLBAR_ACCESS_TOKEN` is set (no explicit account to
 
 `list-items(status?, level?, environment?, page?, limit?, query?, project?)`: Search and filter Rollbar items instead of pulling the whole list. Filter by `status` (default `active`, so resolved and muted items stay out of your way), `level`, and `environment`, or search by `query` text. Use `page` and `limit` to control how much comes back at once. Optional `project` when multiple projects are configured or in account-token mode.
 
-`get-occurrence-metrics(start_time?, end_time?, granularity?, timezone?, filters?, group_by?, aggregates?, sort?, limit?, offset?, project?)`: Answer "how many, and broken down by what" questions across occurrences in one or more projects, such as daily error counts per item, which browsers or code versions an error hits, how many distinct users it affected, or which projects log a given message. It calls the Rollbar Metrics API (`POST /api/1/metrics/occurrences`), which requires the account's Advanced package. Other accounts get a 403.
+`get-metrics(table, start_time?, end_time?, granularity?, timezone?, filters?, group_by?, aggregates?, sort?, limit?, offset?, project?)`: Answer "how many, and broken down by what" questions in one or more projects with the Rollbar Metrics API, which requires the account's Advanced package. Other accounts get a 403. `table` chooses what to count:
 
-`start_time` and `end_time` are Unix seconds. Leave out `start_time` to start at the account's data retention boundary, and leave out `end_time` for no upper bound. With `granularity` (`second` through `year`), rows are bucketed into one timepoint per period, in `timezone` (default UTC). Without it, everything comes back in a single timepoint. `filters` must all match. Each filter takes a `field`, an `operator` (`eq`, `ne`, `gt`, `gte`, `lt`, `lte`, `like`, `ilike`, `is_null`, `not_null`), `values`, and, for key/value columns like `request_headers` or `customs`, a `key`. `aggregates` take a `field`, a `function` (`count_all`, `count_distinct`, `max`, `min`, `sum`, `topk`, `quantiles`, `array`, `json_array_length`), an `alias`, and optional string `parameters`. `sort` is one `{ field, order }` or a list of them. The default order is timestamp ascending, so sort by `occurrence_count` descending for top-N questions.
+- `occurrences` (`POST /api/1/metrics/occurrences`): errors and messages. For example, daily error counts per item, which browsers or code versions an error hits, how many distinct users it affected, or which projects log a given message.
+- `traces` (`POST /api/1/metrics/traces`, which Rollbar's public API docs don't list yet): session replays and their telemetry, which are stored as OpenTelemetry spans. For example, how many replays were recorded each day, which sessions or users have replays, what triggered them, or how long they ran.
 
-The result is `{ timepoints: [{ timestamp, rows }], last_occurrence_timestamp, row_count }`. Each row is a flat object holding its `group_by` columns, aggregate aliases, and `occurrence_count`. Rows also include `project_slug` when grouped by `project_id`. The API returns every matching row when no limit is given, so this tool always sends `limit` (default 100, max 1000). When a page is full, the result includes `next_offset` to pass as `offset`.
+Both tables take the same parameters and return the same result shape.
+
+`start_time` and `end_time` are Unix seconds. Leave out `start_time` to start at the account's data retention boundary, and leave out `end_time` for no upper bound. With `granularity` (`second` through `year`), rows are bucketed into one timepoint per period, in `timezone` (default UTC). Without it, everything comes back in a single timepoint. `filters` must all match. Each filter takes a `field`, an `operator` (`eq`, `ne`, `gt`, `gte`, `lt`, `lte`, `like`, `ilike`, `is_null`, `not_null`), `values`, and, for key/value columns like `request_headers`, `customs` or `attributes`, a `key`. `aggregates` take a `field`, a `function` (`count_all`, `count_distinct`, `max`, `min`, `sum`, `topk`, `quantiles`, `array`, `json_array_length`), an `alias`, an optional `key`, and optional string `parameters`. Each alias must be unique and can't reuse a field the row already has: a `group_by` column, the count, or `project_slug` when grouping by `project_id`. On `traces`, an alias also can't be `session_id`, `trace_id`, `span_id` or `parent_span_id`, since the API formats values under those names as hex IDs. `sort` is a list of `{ field, order }` in priority order. The default order is timestamp ascending, so sort by `occurrence_count` descending for top-N questions.
+
+`topk` returns the most frequent values first, each as `{ value, count, count_error }`. Its `parameters` are how many values to return (default 10) and an optional load factor (default 3), which trades memory for accuracy. Values come back as strings, and `count_error` is how far `count` may overstate the true count, 0 when it's exact.
+
+A `key` names one entry and is taken literally, dots included, so pass attribute names as they are, such as `"key": "rollbar.replay.id"`. The tool escapes the dots, which the API would otherwise read as the start of a JSON path. The API matches keys case-insensitively, and an `_` in a key matches any one character. To read a value inside an entry that holds JSON, add a `path`: `{ "key": "timings", "path": "execution_duration" }` reads `$.execution_duration` from the `timings` entry. A `path` that starts with `$.` works too.
+
+The result is `{ timepoints: [{ timestamp, rows }], last_timestamp, row_count }`. Each row is a flat object holding its `group_by` columns, aggregate aliases, and its count, `occurrence_count` or `span_count`. Rows also include `project_slug` when grouped by `project_id`. `last_timestamp` is the newest timestamp among the returned rows (with `granularity`, the newest timepoint's), or `null` when nothing matched. The API returns every matching row when no limit is given, so this tool always sends `limit` (default 100, max 1000). When a page is full, the result includes `next_offset` to pass as `offset`. A result over 80,000 characters (about 20,000 tokens) returns an error instead. The error says about how many rows would fit, or, when a single row is over the limit (a large `array` aggregate can do that), that a lower `limit` won't help.
 
 `project` chooses which projects to query; a `project_id` filter is rejected. With an account or user token, omit `project` to query every project the token can read, or pass a name or id, or a list of them, to query only those. Group by `project_id` to see which project each row came from. A broad search across every project, such as a `message_body` `like` filter, can be slow, so narrow the time range for those. A project token only reaches its own project, so with project tokens each call queries one project: name it, or omit `project` when only one is configured. A list of several projects returns an error in that mode, since each token would need its own request and percentiles from separate requests can't be combined. If you configure project tokens alongside an account token, a configured project name works on its own, with its project token. A list is one request on the account token, though, so name each project in a list by its Rollbar name or id.
 
+Daily occurrences per item in production, with the number of people affected:
+
 ```json
-{ "project": "Backend", "start_time": 1761955200, "granularity": "day", "filters": [{ "field": "environment", "operator": "eq", "values": ["production"] }], "group_by": ["item_counter"], "aggregates": [{ "field": "person_id", "function": "count_distinct", "alias": "people" }], "sort": { "field": "occurrence_count", "order": "desc" }, "limit": 20 }
+{ "table": "occurrences", "project": "Backend", "start_time": 1761955200, "granularity": "day", "filters": [{ "field": "environment", "operator": "eq", "values": ["production"] }], "group_by": ["item_counter"], "aggregates": [{ "field": "person_id", "function": "count_distinct", "alias": "people" }], "sort": [{ "field": "occurrence_count", "order": "desc" }], "limit": 20 }
 ```
 
 Which projects logged a message since `start_time`, across every project the token can read:
 
 ```json
-{ "start_time": 1761955200, "filters": [{ "field": "message_body", "operator": "like", "values": ["%Successfully deleted%"] }], "group_by": ["project_id", "item_counter"], "sort": { "field": "occurrence_count", "order": "desc" } }
+{ "table": "occurrences", "start_time": 1761955200, "filters": [{ "field": "message_body", "operator": "like", "values": ["%Successfully deleted%"] }], "group_by": ["project_id", "item_counter"], "sort": [{ "field": "occurrence_count", "order": "desc" }] }
+```
+
+The `traces` columns are `project_id`, `environment`, `name`, `kind`, `session_id`, `trace_id`, `span_id`, `start_time`, `duration` (nanoseconds), the key/value columns `attributes` and `events_attributes`, and the event columns `events_name`, `events_time`, `events_attributes_name` and `events_attributes_value`. IDs come back as hex strings when you group by them, and filters take hex strings. An aggregate over an ID column, such as `array` or `topk`, returns decimal strings instead, which don't work as filter values, so group by the ID column when you need IDs to pass on. The time range and `granularity` apply to `start_time`. `parent_id` isn't available: the backend rejects it.
+
+Replay recordings are spans named `rrweb-replay-recording`, and their telemetry spans are named `rollbar-telemetry`. Both carry the replay's ID in the `rollbar.replay.id` attribute and share a `session_id`. Replay spans also carry attributes such as `rollbar.replay.trigger.type`, `rollbar.replay.url.full`, `rollbar.occurrence.uuids`, `user.id`, `user.email`, `user_agent.original` and `client.address`, so results can include personal data.
+
+A few things work differently for `traces`:
+
+- `span_count` can't be a sort field. Add a `count_all` aggregate with an alias and sort on that.
+- Rows can't be grouped by an attribute. To count spans per attribute value, use `topk` on the attribute. To see an attribute's values per session, group by `session_id` (or `trace_id`, `span_id`) and use `count_distinct` or `array` on it. `array` repeats a value once per span.
+- An aggregate on an event column, other than `array`, counts once per span event. That also inflates `span_count` and every other aggregate in the same query, so query event columns on their own.
+- A replay's recording is stored in its span events and can run to several megabytes, well over the size limit. Use `get-replay` to read a replay.
+
+The 10 most recent replays, with the session, environment and replay IDs that `get-replay` takes:
+
+```json
+{ "table": "traces", "project": "Frontend", "filters": [{ "field": "name", "operator": "eq", "values": ["rrweb-replay-recording"] }], "group_by": ["session_id", "environment"], "aggregates": [{ "field": "attributes", "key": "rollbar.replay.id", "function": "array", "alias": "replay_ids" }, { "field": "start_time", "function": "min", "alias": "first_start" }], "sort": [{ "field": "first_start", "order": "desc" }], "limit": 10 }
+```
+
+Replays and sessions per day:
+
+```json
+{ "table": "traces", "project": "Frontend", "start_time": 1761955200, "granularity": "day", "filters": [{ "field": "name", "operator": "eq", "values": ["rrweb-replay-recording"] }], "aggregates": [{ "field": "attributes", "key": "rollbar.replay.id", "function": "count_distinct", "alias": "replays" }, { "field": "session_id", "function": "count_distinct", "alias": "sessions" }] }
+```
+
+What triggered replays, with a count for each trigger type:
+
+```json
+{ "table": "traces", "project": "Frontend", "filters": [{ "field": "name", "operator": "eq", "values": ["rrweb-replay-recording"] }], "aggregates": [{ "field": "attributes", "key": "rollbar.replay.trigger.type", "function": "topk", "parameters": ["5"], "alias": "triggers" }] }
 ```
 
 `list-occurrences(counter, limit?, page?, last_id?, max_tokens?, project?)`: Look up the actual occurrences behind a Rollbar item, not just the item summary. Give it the item's counter and it returns the individual instances, each with its own timestamp, environment, and error detail.

@@ -46,7 +46,7 @@ function ok(result: unknown) {
   return new Response(JSON.stringify({ err: 0, result }), { status: 200 });
 }
 
-describe("get-occurrence-metrics over MCP", () => {
+describe("get-metrics on the occurrences table over MCP", () => {
   let client: Client;
   let server: McpServer;
   let fetchMock: ReturnType<typeof vi.fn>;
@@ -110,7 +110,10 @@ describe("get-occurrence-metrics over MCP", () => {
 
   async function call(args: Record<string, unknown>) {
     const result = CallToolResultSchema.parse(
-      await client.callTool({ name: "get-occurrence-metrics", arguments: args }),
+      await client.callTool({
+        name: "get-metrics",
+        arguments: { table: "occurrences", ...args },
+      }),
     );
     const text = result.content.find((entry) => entry.type === "text")?.text;
     expect(typeof text).toBe("string");
@@ -122,14 +125,19 @@ describe("get-occurrence-metrics over MCP", () => {
     return { url, options, body: JSON.parse(options.body) };
   }
 
-  it("advertises the tool as read-only", async () => {
+  it("advertises one read-only tool that requires a table, with no $ref", async () => {
     vi.stubEnv("ROLLBAR_ACCOUNT_ACCESS_TOKEN", "account-token");
     await connect();
     const { tools } = await client.listTools();
-    expect(
-      tools.find((tool) => tool.name === "get-occurrence-metrics")?.annotations
-        ?.readOnlyHint,
-    ).toBe(true);
+    const tool = tools.find((entry) => entry.name === "get-metrics");
+
+    expect(tool?.annotations?.readOnlyHint).toBe(true);
+    expect(tool?.inputSchema.required).toEqual(["table"]);
+    expect(tool?.inputSchema.properties?.table).toMatchObject({
+      enum: ["occurrences", "traces"],
+    });
+    // Some MCP clients can't resolve a $ref in a tool's input schema.
+    expect(JSON.stringify(tool?.inputSchema)).not.toContain("$ref");
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -197,7 +205,7 @@ describe("get-occurrence-metrics over MCP", () => {
           field: "code_version",
           function: "topk",
           alias: "top_versions",
-          parameters: ["3"],
+          parameters: ["3", "3", "counts"],
         },
       ],
       sort: [{ field: "occurrence_count", order: "desc" }],
@@ -230,9 +238,52 @@ describe("get-occurrence-metrics over MCP", () => {
           ],
         },
       ],
-      last_occurrence_timestamp: 1632599870,
+      last_timestamp: 1632599870,
       row_count: 2,
     });
+  });
+
+  it("takes keys literally, escaping their dots, and reads a path inside the value", async () => {
+    useAccountToken();
+    fetchMock.mockResolvedValueOnce(ok(metrics));
+    await connect();
+
+    const result = await call({
+      filters: [
+        {
+          field: "customs",
+          key: "job.name",
+          operator: "eq",
+          values: ["DeleteReplaysByPerson"],
+        },
+      ],
+      aggregates: [
+        {
+          field: "customs",
+          key: "timings",
+          path: "execution_duration",
+          function: "max",
+          alias: "max_duration",
+        },
+      ],
+    });
+
+    expect(result.isError).toBeFalsy();
+    const { body } = lastRequest();
+    expect(body.filters[0]).toEqual({
+      field: "customs",
+      key: "job\\.name",
+      operator: "eq",
+      values: ["DeleteReplaysByPerson"],
+    });
+    expect(body.aggregates).toEqual([
+      {
+        field: "customs",
+        key: "timings.execution_duration",
+        function: "max",
+        alias: "max_duration",
+      },
+    ]);
   });
 
   it("sends only the default limit and offset for an empty query", async () => {
@@ -246,7 +297,7 @@ describe("get-occurrence-metrics over MCP", () => {
     expect(lastRequest().body).toEqual({ filters: [], limit: 100, offset: 0 });
     expect(JSON.parse(result.text)).toEqual({
       timepoints: [],
-      last_occurrence_timestamp: null,
+      last_timestamp: null,
       row_count: 0,
     });
   });
@@ -265,7 +316,7 @@ describe("get-occurrence-metrics over MCP", () => {
     expect(result.isError).toBeFalsy();
     expect(JSON.parse(result.text)).toEqual({
       timepoints: [],
-      last_occurrence_timestamp: null,
+      last_timestamp: null,
       row_count: 0,
     });
   });
@@ -447,12 +498,115 @@ describe("get-occurrence-metrics over MCP", () => {
     ["an unknown filter operator", { filters: [{ field: "environment", operator: "in", values: ["x"] }] }],
     ["an aggregate alias with a dash", { aggregates: [{ field: "person_id", function: "count_distinct", alias: "person-count" }] }],
     ["a limit over the maximum", { limit: 1001 }],
+    ["a missing table", { table: undefined }],
+    ["an unknown table", { table: "items" }],
+    ["a sort that isn't a list", { sort: { field: "occurrence_count", order: "desc" } }],
   ])("rejects %s before any request", async (_label, args) => {
     useAccountToken();
     await connect();
 
     expect((await call(args)).isError).toBe(true);
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [
+      "a repeated alias",
+      {
+        aggregates: [
+          { field: "person_id", function: "count_distinct", alias: "n" },
+          { field: "ip_address", function: "count_distinct", alias: "n" },
+        ],
+      },
+      /"n" is used by more than one aggregate/,
+    ],
+    [
+      "the count column as an alias",
+      {
+        aggregates: [
+          { field: "person_id", function: "count_all", alias: "occurrence_count" },
+        ],
+      },
+      /every row already has occurrence_count/,
+    ],
+    [
+      "project_slug as an alias",
+      {
+        group_by: ["project_id"],
+        aggregates: [
+          { field: "person_id", function: "count_distinct", alias: "project_slug" },
+        ],
+      },
+      /rows grouped by project_id already have project_slug/,
+    ],
+    [
+      "a group_by column as an alias",
+      {
+        group_by: ["environment"],
+        aggregates: [
+          { field: "environment", function: "max", alias: "environment" },
+        ],
+      },
+      /environment is also a group_by column/,
+    ],
+  ])(
+    "rejects %s, which would overwrite a row field, before any request",
+    async (_label, args, message) => {
+      useAccountToken();
+      await connect();
+
+      const result = await call(args);
+
+      expect(result.isError).toBe(true);
+      expect(result.text).toMatch(message);
+      expect(fetchMock).not.toHaveBeenCalled();
+    },
+  );
+
+  it("accepts project_slug as an alias when not grouping by project_id", async () => {
+    useAccountToken();
+    fetchMock.mockResolvedValueOnce(ok(metrics));
+    await connect();
+
+    const result = await call({
+      aggregates: [
+        { field: "person_id", function: "count_distinct", alias: "project_slug" },
+      ],
+    });
+
+    expect(result.isError).toBeFalsy();
+    expect(lastRequest().body.aggregates[0].alias).toBe("project_slug");
+  });
+
+  it("suggests a limit that fits when the result is over the size limit", async () => {
+    useAccountToken();
+    const row = (counter: number) => [
+      { field: "item_counter", value: counter },
+      { field: "item_title", value: "x".repeat(1000) },
+      { field: "occurrence_count", value: 1 },
+    ];
+    fetchMock.mockResolvedValueOnce(
+      ok({
+        timepoints: [
+          {
+            timestamp: 1632528000,
+            metrics_rows: Array.from({ length: 100 }, (_, i) => row(i)),
+          },
+        ],
+      }),
+    );
+    await connect();
+
+    const result = await call({ group_by: ["item_counter", "item_title"] });
+
+    expect(result.isError).toBe(true);
+    expect(result.text).toMatch(/over this tool's 80000-character limit/);
+    const fit = Number(
+      result.text.match(/About (\d+) rows fit: set limit to \1 /)?.[1],
+    );
+    expect(fit).toBeGreaterThan(0);
+    expect(fit).toBeLessThan(100);
+    expect(result.text).not.toMatch(/get-replay/);
   });
 
   it("surfaces the backend message and a Metrics API hint on 403", async () => {

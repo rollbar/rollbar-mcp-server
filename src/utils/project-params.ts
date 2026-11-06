@@ -43,6 +43,6 @@ export function buildProjectsParam() {
     .union([z.string(), z.array(z.string()).min(1)])
     .optional()
     .describe(
-      "Project name or numeric id, or a list of them. Omit to query every project the token can read. A list requires an account or user token.",
+      "Project name or id, or a list of them. Omit for every project the token can read. A list needs an account or user token.",
     );
 }

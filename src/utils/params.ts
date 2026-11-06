@@ -53,8 +53,8 @@ export interface ProjectIdsMetricsFilter {
  * account or user token, so a resolution bug fails closed instead of widening
  * the query to every project.
  *
- * Use for: POST /metrics/occurrences (get-occurrence-metrics), with the
- * `projectIds` from resolveProjectScope().
+ * Use for: POST /metrics/occurrences and POST /metrics/traces (get-metrics),
+ * with the `projectIds` from resolveProjectScope().
  */
 export function injectProjectIdsMetricsFilter<T>(
   filters: T[],

@@ -23,7 +23,7 @@ function buildAuthErrorHint(
     if (toolName === "post-item-comment") {
       return "Posting requires a user-scoped account token with read and write scope and comment permission on the selected project. Configure userToken / ROLLBAR_USER_ACCESS_TOKEN; project and account-wide tokens cannot post comments.";
     }
-    if (toolName === "get-occurrence-metrics") {
+    if (toolName === "get-metrics") {
       return "The Metrics API requires the account's Advanced package, and a read-scope token that can read the selected projects.";
     }
     if (toolName === "update-item") {
