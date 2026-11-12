@@ -11,6 +11,8 @@ import { registerListOccurrencesTool } from "./list-occurrences.js";
 import { registerListItemEventsTool } from "./list-item-events.js";
 import { registerPostItemCommentTool } from "./post-item-comment.js";
 import { registerGetMetricsTool } from "./get-metrics.js";
+import { registerStartRcaTool } from "./start-rca.js";
+import { registerStartResolveTool } from "./start-resolve.js";
 
 export function registerAllTools(server: McpServer) {
   registerGetItemDetailsTool(server);
@@ -25,4 +27,6 @@ export function registerAllTools(server: McpServer) {
   registerListItemEventsTool(server);
   registerPostItemCommentTool(server);
   registerGetMetricsTool(server);
+  registerStartRcaTool(server);
+  registerStartResolveTool(server);
 }
