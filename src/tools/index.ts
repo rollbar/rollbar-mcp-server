@@ -13,6 +13,7 @@ import { registerPostItemCommentTool } from "./post-item-comment.js";
 import { registerGetMetricsTool } from "./get-metrics.js";
 import { registerStartRcaTool } from "./start-rca.js";
 import { registerStartResolveTool } from "./start-resolve.js";
+import { registerGetAgentTaskStatusTool } from "./get-agent-task-status.js";
 
 export function registerAllTools(server: McpServer) {
   registerGetItemDetailsTool(server);
@@ -29,4 +30,5 @@ export function registerAllTools(server: McpServer) {
   registerGetMetricsTool(server);
   registerStartRcaTool(server);
   registerStartResolveTool(server);
+  registerGetAgentTaskStatusTool(server);
 }

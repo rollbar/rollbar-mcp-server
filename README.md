@@ -10,7 +10,7 @@ This MCP server implements the `stdio` server type, which means your AI tool (e.
 
 ### User access token
 
-To read item history, post comments as yourself, or start RCA and Resolve tasks, configure a Rollbar **user-scoped account access token** with `ROLLBAR_USER_ACCESS_TOKEN`, or use a config file:
+To read item history, post comments as yourself, or start and check RCA and Resolve tasks, configure a Rollbar **user-scoped account access token** with `ROLLBAR_USER_ACCESS_TOKEN`, or use a config file:
 
 ```json
 { "userToken": "<user access token>" }
@@ -19,6 +19,8 @@ To read item history, post comments as yourself, or start RCA and Resolve tasks,
 Use **read** scope for reads, or **read and write** to post comments. The MCP resolves your project through `GET /projects` (read scope), then posts with write scope. Your Rollbar user also needs **view** permission to read history and **comment** permission to post in that project. Project tokens and ordinary account tokens cannot post comments.
 
 `start-rca` and `start-resolve` require **write** scope and the user's **collab** permission on the relevant projects. They use occurrence/session IDs directly and do not call `GET /projects`, so they also work with a write-only user token and accounts with multiple projects. Project tokens and ordinary account-wide tokens cannot start these tasks.
+
+`get-agent-task-status` requires **read** scope and the user's **view** permission on the account and every project in the run. It uses the session ID directly without project discovery. Project tokens and ordinary account-wide tokens cannot read these runs. Configure a personal token with **read and write** scope to both start runs and check their results.
 
 User mode sends every request with the configured user's token, including when per-project tokens are also present. Comment authorship comes from that token; you cannot supply a different author. The backend marks posted comments with `via_api: true` and handles normal subscriptions and notifications.
 
@@ -98,6 +100,7 @@ Required scopes:
 - As with project tokens, prefer a read-scope token unless you specifically need `update-item`.
 - `post-item-comment` requires a **user** token with **read and write** scope and project **comment** permission.
 - `start-rca` and `start-resolve` require a **user-scoped account** token with **write** scope and **collab** permission on the task's projects. They do not require project discovery.
+- `get-agent-task-status` requires a **user-scoped account** token with **read** scope and **view** permission on the account and every project in the run. It does not require project discovery.
 
 If the server detects only `ROLLBAR_ACCESS_TOKEN` is set (no explicit account token), it makes a one-time, cached check against `GET /projects` to see whether that token is actually an account token; if so, account mode activates automatically. A single project-scoped token continues to work exactly as before.
 
@@ -255,6 +258,22 @@ Both tools return JSON text containing `{ "task_session_id": "<new task session 
 Starting tasks consumes credits. Both tools are non-idempotent writes and do not retry failures automatically. If a response is lost, check the task state in Rollbar before retrying. Backend error messages are preserved, including authentication/permissions (401/403), invalid input (400), unavailable RCA runs (404), active-task conflicts (409), and service validation such as insufficient credits (422).
 
 These tools require the public agent-task endpoints from [mox #14547](https://github.com/rollbar/mox/pull/14547) and [moxapi #1273](https://github.com/rollbar/moxapi/pull/1273) to be deployed on the target API. To test a branch deployment, set `apiBase` in the config file or `ROLLBAR_API_BASE` in environment-only configuration.
+
+#### Check RCA and Resolve status
+
+`get-agent-task-status(task_session_id)`: Read an RCA or Resolve run through `GET /agent_tasks/{task_session_id}`. Supply the session ID returned by `start-rca` or `start-resolve`, as a nonblank string. This is a read-only, idempotent tool with no `project` argument. It makes one request per call; call it again later to poll for completion.
+
+Example arguments:
+
+```json
+{ "task_session_id": "<session ID returned when the run started>" }
+```
+
+The response is JSON text containing `task_session_id`, `agent_type` (`rca` or `resolve`) and `status` (`queued`, `running`, `blocked`, `canceling`, `finished`, `failed` or `canceled`). Results are absent until the run finishes. A finished RCA exposes `rca_results.results.root_cause` when available; a finished Resolve exposes `resolve_results.pull_request_url`. Finished result fields can be `null` when no output was recorded. A failed run may include `failure_reason` with `agent_failure_code` and/or `message`. All additional result fields are preserved.
+
+The backend requires a personal account token with **read** scope, **view** access to the account and every project in the run, and the account's `ai-features-enabled` flag. A **403** indicates insufficient scope/access or disabled AI features. A **404** covers unknown, expired or other-account runs. Backend errors are returned as tool errors, not as run statuses.
+
+This tool requires the status endpoint from [mox #14555](https://github.com/rollbar/mox/pull/14555) and [moxapi #1277](https://github.com/rollbar/moxapi/pull/1277) to be deployed on the target API.
 
 ## How to Use
 
