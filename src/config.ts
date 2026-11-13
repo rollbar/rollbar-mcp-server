@@ -433,10 +433,12 @@ export function resolveProject(name: string | undefined): ProjectConfig {
 }
 
 /** Resolve connected-user credentials for account endpoints without project discovery. */
-export function resolveUserAuthContext(): AuthContext {
+export function resolveUserAuthContext(
+  scope: "read" | "write" = "write",
+): AuthContext {
   if (ACCOUNT_AUTH?.tokenType !== "user") {
     throw new Error(
-      "This operation requires a user-scoped account token. Set userToken in .rollbar-mcp.json or ROLLBAR_USER_ACCESS_TOKEN with write scope (and read scope for tools that resolve a project).",
+      `This operation requires a user-scoped account token. Set userToken in .rollbar-mcp.json or ROLLBAR_USER_ACCESS_TOKEN with ${scope} scope${scope === "write" ? " (and read scope for tools that resolve a project)" : ""}.`,
     );
   }
   return { ...ACCOUNT_AUTH, apiBase: DEFAULT_API_BASE };

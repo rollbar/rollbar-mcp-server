@@ -1,8 +1,10 @@
 import { resolveUserAuthContext } from "../config.js";
 import type {
   RollbarAgentTaskStartResponse,
+  RollbarAgentTaskStatusResponse,
   RollbarApiResponse,
 } from "../types/index.js";
+import { AGENT_TASK_STATUSES } from "../types/index.js";
 import { makeRollbarRequest } from "./api.js";
 import { getRollbarResult } from "./response.js";
 
@@ -39,6 +41,33 @@ export async function startAgentTask(
     result.task_session_id.trim().length === 0
   ) {
     throw new Error("Invalid Rollbar API response: missing task session ID");
+  }
+  return result;
+}
+
+/** Read one snapshot of a run; the caller decides when to check again. */
+export async function getAgentTaskStatus(
+  taskSessionId: string,
+): Promise<RollbarAgentTaskStatusResponse> {
+  const auth = resolveUserAuthContext("read");
+  const response = await makeRollbarRequest<
+    RollbarApiResponse<RollbarAgentTaskStatusResponse>
+  >(
+    `${auth.apiBase}/agent_tasks/${encodeURIComponent(taskSessionId)}`,
+    "get-agent-task-status",
+    auth.token,
+    { method: "GET" },
+  );
+  const result = getRollbarResult(response, "agent task status");
+  if (
+    typeof result !== "object" ||
+    Array.isArray(result) ||
+    typeof result.task_session_id !== "string" ||
+    result.task_session_id.trim().length === 0 ||
+    (result.agent_type !== "rca" && result.agent_type !== "resolve") ||
+    !AGENT_TASK_STATUSES.includes(result.status)
+  ) {
+    throw new Error("Invalid Rollbar API response: invalid agent task status");
   }
   return result;
 }

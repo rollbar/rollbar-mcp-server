@@ -9,6 +9,36 @@ export interface RollbarAgentTaskStartResponse {
   task_session_id: string;
 }
 
+export const AGENT_TASK_STATUSES = [
+  "queued",
+  "running",
+  "blocked",
+  "canceling",
+  "finished",
+  "failed",
+  "canceled",
+] as const;
+
+export interface RollbarAgentTaskStatusResponse {
+  task_session_id: string;
+  agent_type: "rca" | "resolve";
+  status: (typeof AGENT_TASK_STATUSES)[number];
+  rca_results?: {
+    results?: { root_cause?: string | null; [key: string]: unknown };
+    [key: string]: unknown;
+  } | null;
+  resolve_results?: {
+    pull_request_url?: string;
+    [key: string]: unknown;
+  } | null;
+  failure_reason?: {
+    agent_failure_code?: string;
+    message?: string;
+    [key: string]: unknown;
+  };
+  [key: string]: unknown;
+}
+
 export interface RollbarItemResponse {
   id: number;
   counter: number;
