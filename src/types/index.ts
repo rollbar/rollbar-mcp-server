@@ -5,6 +5,10 @@ export interface RollbarApiResponse<T> {
   message?: string;
 }
 
+export interface RollbarAgentTaskStartResponse {
+  task_session_id: string;
+}
+
 export interface RollbarItemResponse {
   id: number;
   counter: number;

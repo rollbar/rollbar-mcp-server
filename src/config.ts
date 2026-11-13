@@ -432,6 +432,16 @@ export function resolveProject(name: string | undefined): ProjectConfig {
   return found;
 }
 
+/** Resolve connected-user credentials for account endpoints without project discovery. */
+export function resolveUserAuthContext(): AuthContext {
+  if (ACCOUNT_AUTH?.tokenType !== "user") {
+    throw new Error(
+      "This operation requires a user-scoped account token. Set userToken in .rollbar-mcp.json or ROLLBAR_USER_ACCESS_TOKEN with write scope (and read scope for tools that resolve a project).",
+    );
+  }
+  return { ...ACCOUNT_AUTH, apiBase: DEFAULT_API_BASE };
+}
+
 /**
  * Resolves the auth context (token + tokenType + resolved projectId) for a
  * given `project` request parameter. This is the account-token-aware
@@ -452,11 +462,7 @@ export async function resolveAuthContext(
   project: string | undefined,
   options: { requireUserToken?: boolean } = {},
 ): Promise<AuthContext> {
-  if (options.requireUserToken && ACCOUNT_AUTH?.tokenType !== "user") {
-    throw new Error(
-      "Posting comments requires a user access token. Set userToken in .rollbar-mcp.json or ROLLBAR_USER_ACCESS_TOKEN with read and write scope.",
-    );
-  }
+  if (options.requireUserToken) resolveUserAuthContext();
 
   // (a) Selectable project tokens take precedence for a matching name.
   if (project !== undefined) {

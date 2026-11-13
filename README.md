@@ -10,7 +10,7 @@ This MCP server implements the `stdio` server type, which means your AI tool (e.
 
 ### User access token
 
-To read item history and post comments as yourself, configure a Rollbar **user-scoped account access token** with `ROLLBAR_USER_ACCESS_TOKEN`, or use a config file:
+To read item history, post comments as yourself, or start RCA and Resolve tasks, configure a Rollbar **user-scoped account access token** with `ROLLBAR_USER_ACCESS_TOKEN`, or use a config file:
 
 ```json
 { "userToken": "<user access token>" }
@@ -18,11 +18,13 @@ To read item history and post comments as yourself, configure a Rollbar **user-s
 
 Use **read** scope for reads, or **read and write** to post comments. The MCP resolves your project through `GET /projects` (read scope), then posts with write scope. Your Rollbar user also needs **view** permission to read history and **comment** permission to post in that project. Project tokens and ordinary account tokens cannot post comments.
 
+`start-rca` and `start-resolve` require **write** scope and the user's **collab** permission on the relevant projects. They use occurrence/session IDs directly and do not call `GET /projects`, so they also work with a write-only user token and accounts with multiple projects. Project tokens and ordinary account-wide tokens cannot start these tasks.
+
 User mode sends every request with the configured user's token, including when per-project tokens are also present. Comment authorship comes from that token; you cannot supply a different author. The backend marks posted comments with `via_api: true` and handles normal subscriptions and notifications.
 
 Configure exactly one of `userToken` / `ROLLBAR_USER_ACCESS_TOKEN` or `accountToken` / `ROLLBAR_ACCOUNT_ACCESS_TOKEN`. Configuring both fails at startup, including when one comes from a file and the other from the environment. A file value overrides the environment value for the same token type. `apiBase` in a file or `ROLLBAR_API_BASE` in environment-only configuration selects a custom API endpoint.
 
-Use `list-projects` to find the project name or numeric ID for the tools' `project` argument. It is optional when your user token can see exactly one enabled project. A token supplied only through the legacy `ROLLBAR_ACCESS_TOKEN` setting is not inferred to be a user token; set `ROLLBAR_USER_ACCESS_TOKEN` explicitly for posting.
+Use `list-projects` to find the project name or numeric ID for the tools' `project` argument. It is optional when your user token can see exactly one enabled project. A token supplied only through the legacy `ROLLBAR_ACCESS_TOKEN` setting is not inferred to be a user token; set `ROLLBAR_USER_ACCESS_TOKEN` explicitly for posting comments or starting agent tasks.
 
 ### Account access token
 
@@ -95,6 +97,7 @@ Required scopes:
 - `update-item` requires an account token with **both read and write** scope: every account-token call resolves the target project via `GET /projects` first (read), then makes the `PATCH` request (write). A write-only token will fail at the project-resolution step before ever reaching the update.
 - As with project tokens, prefer a read-scope token unless you specifically need `update-item`.
 - `post-item-comment` requires a **user** token with **read and write** scope and project **comment** permission.
+- `start-rca` and `start-resolve` require a **user-scoped account** token with **write** scope and **collab** permission on the task's projects. They do not require project discovery.
 
 If the server detects only `ROLLBAR_ACCESS_TOKEN` is set (no explicit account token), it makes a one-time, cached check against `GET /projects` to see whether that token is actually an account token; if so, account mode activates automatically. A single project-scoped token continues to work exactly as before.
 
@@ -225,6 +228,33 @@ Optional `project` when multiple projects are configured or in account-token mod
 `update-item(itemId, status?, level?, title?, assignedUserId?, resolvedInVersion?, snoozed?, teamId?, project?)`: Change an item's status, level, title, assignee, resolved version, snooze state, or owning team, so you can act on an item directly instead of switching to the Rollbar UI.
 
 This needs write access: a project token with `write` scope, or an account/user token with both `read` and `write` scope, subject to the user's permissions. A read-only token will fail here. Optional `project` when multiple projects are configured or in account-token mode. Example prompt: `Mark Rollbar item #123456 as resolved` or `Assign item #123456 to user ID 789`.
+
+#### Start RCA and Resolve
+
+`start-rca(source_occurrence_id, continue_with_resolve?)`: Start an asynchronous root cause analysis through `POST /agent_tasks/rca`. `source_occurrence_id` must be an **occurrence ID**, not an item ID or counter, and must be supplied as a **string**. Pass decimal or hexadecimal IDs unchanged; converting them to JavaScript numbers can lose precision. `continue_with_resolve` defaults to `false`; set it to `true` to request Resolve after RCA.
+
+Example `start-rca` arguments:
+
+```json
+{ "source_occurrence_id": "123456", "continue_with_resolve": false }
+```
+
+`start-resolve(rca_task_session_id, initial_instructions?)`: Start Resolve through `POST /agent_tasks/resolve` using the session ID of a suitable **completed RCA run in the same account**. Optional `initial_instructions` extends the normal Resolve work, accepts up to **4,000 Unicode characters**, and is sent unchanged, including whitespace. An empty string is allowed.
+
+Example `start-resolve` arguments, after that RCA run has completed:
+
+```json
+{
+  "rca_task_session_id": "<session ID returned by start-rca>",
+  "initial_instructions": "Use approach B and add a regression test."
+}
+```
+
+Both tools return JSON text containing `{ "task_session_id": "<new task session ID>" }`. This confirms that a task started; it does not return the analysis or wait for completion. Neither tool takes a `project` argument: the backend derives the projects from the occurrence or RCA session and checks the connected user's permissions.
+
+Starting tasks consumes credits. Both tools are non-idempotent writes and do not retry failures automatically. If a response is lost, check the task state in Rollbar before retrying. Backend error messages are preserved, including authentication/permissions (401/403), invalid input (400), unavailable RCA runs (404), active-task conflicts (409), and service validation such as insufficient credits (422).
+
+These tools require the public agent-task endpoints from [mox #14547](https://github.com/rollbar/mox/pull/14547) and [moxapi #1273](https://github.com/rollbar/moxapi/pull/1273) to be deployed on the target API. To test a branch deployment, set `apiBase` in the config file or `ROLLBAR_API_BASE` in environment-only configuration.
 
 ## How to Use
 

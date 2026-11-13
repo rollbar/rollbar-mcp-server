@@ -20,6 +20,9 @@ function buildAuthErrorHint(
   }
 
   if (status === 403) {
+    if (toolName === "start-rca" || toolName === "start-resolve") {
+      return "Starting agent tasks requires a user-scoped account token with write scope and collab permission on the task's projects. Configure userToken / ROLLBAR_USER_ACCESS_TOKEN; project and account-wide tokens cannot start agent tasks.";
+    }
     if (toolName === "post-item-comment") {
       return "Posting requires a user-scoped account token with read and write scope and comment permission on the selected project. Configure userToken / ROLLBAR_USER_ACCESS_TOKEN; project and account-wide tokens cannot post comments.";
     }
