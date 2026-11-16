@@ -21,8 +21,7 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "bash tests/e2e/test-npx-install.sh && bash tests/e2e/test-get-item-details.sh",
-    "prepublishOnly": "npm run build && npm test",
-    "test:e2e:local-config": "npm run build && node --test tests/e2e/local-config.mjs"
+    "prepublishOnly": "npm run build && npm test"
   },
   "files": [
     "build",

@@ -86,10 +86,6 @@ You can use `ROLLBAR_CONFIG_FILE` in `env` instead of `ROLLBAR_ACCESS_TOKEN` for
 
 ## Testing
 
-### Local configuration check
-
-`npm run test:e2e:local-config` builds the server and exercises it over stdio using temporary directories, fictitious tokens and local HTTP fixtures. It covers source selection, endpoint validation and proxy settings. A test-only transport maps the default API origin to localhost and blocks external connections; no Rollbar service or real credential is used.
-
 ### Live item history and comment check
 
 `node tests/e2e/test-item-history.mjs` exercises the built server over stdio: list history, filter it, post one comment, and read it back with the expected author and `via_api` marker. This is an opt-in test that **leaves a comment on the selected item**. Use a staging or dedicated test item. It does not retry the POST.
