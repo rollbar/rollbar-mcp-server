@@ -23,6 +23,9 @@ function buildAuthErrorHint(
     if (toolName === "get-agent-task-status") {
       return "Reading agent tasks requires a personal account token with read scope, view access to the account and every project in the run, and AI features enabled for the account. Configure userToken / ROLLBAR_USER_ACCESS_TOKEN; project and account-wide tokens cannot read agent tasks.";
     }
+    if (toolName === "send-resolve-feedback") {
+      return "Sending Resolve feedback requires a personal account token with write scope, collab permission on every project in the run, and AI features enabled for the account. Configure userToken / ROLLBAR_USER_ACCESS_TOKEN; project and account-wide tokens cannot send Resolve feedback.";
+    }
     if (toolName === "start-rca" || toolName === "start-resolve") {
       return "Starting agent tasks requires a user-scoped account token with write scope and collab permission on the task's projects. Configure userToken / ROLLBAR_USER_ACCESS_TOKEN; project and account-wide tokens cannot start agent tasks.";
     }
@@ -68,7 +71,8 @@ export async function makeRollbarRequest<T>(
     try {
       const errorJson = JSON.parse(errorText) as { message?: string };
       if (errorJson.message) {
-        errorMessage = `Rollbar API error: ${errorJson.message}`;
+        // Keep the status available for callers deciding whether a failure is retryable.
+        errorMessage = `Rollbar API error: ${errorJson.message} (HTTP ${response.status}${response.statusText ? ` ${response.statusText}` : ""})`;
       }
     } catch {
       // If not JSON, include the raw text if it's short

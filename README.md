@@ -10,7 +10,7 @@ This MCP server implements the `stdio` server type, which means your AI tool (e.
 
 ### User access token
 
-To read item history, post comments as yourself, or start and check RCA and Resolve tasks, configure a Rollbar **user-scoped account access token** with `ROLLBAR_USER_ACCESS_TOKEN`, or use a config file:
+To read item history, post comments as yourself, or start, check and refine RCA and Resolve tasks, configure a Rollbar **user-scoped account access token** with `ROLLBAR_USER_ACCESS_TOKEN`, or use a config file:
 
 ```json
 { "userToken": "<user access token>" }
@@ -21,6 +21,8 @@ Use **read** scope for reads, or **read and write** to post comments. The MCP re
 `start-rca` and `start-resolve` require **write** scope and the user's **collab** permission on the relevant projects. They use occurrence/session IDs directly and do not call `GET /projects`, so they also work with a write-only user token and accounts with multiple projects. Project tokens and ordinary account-wide tokens cannot start these tasks.
 
 `get-agent-task-status` requires **read** scope and the user's **view** permission on the account and every project in the run. It uses the session ID directly without project discovery. Project tokens and ordinary account-wide tokens cannot read these runs. Configure a personal token with **read and write** scope to both start runs and check their results.
+
+`send-resolve-feedback` requires **write** scope, **collab** permission on every project in the Resolve run, and the account's `ai-features-enabled` flag. It uses the existing run ID without project discovery. Use a personal token with **read and write** scope to submit feedback and then check progress.
 
 User mode sends every request with the configured user's token, including when per-project tokens are also present. Comment authorship comes from that token; you cannot supply a different author. The backend marks posted comments with `via_api: true` and handles normal subscriptions and notifications.
 
@@ -101,6 +103,7 @@ Required scopes:
 - `post-item-comment` requires a **user** token with **read and write** scope and project **comment** permission.
 - `start-rca` and `start-resolve` require a **user-scoped account** token with **write** scope and **collab** permission on the task's projects. They do not require project discovery.
 - `get-agent-task-status` requires a **user-scoped account** token with **read** scope and **view** permission on the account and every project in the run. It does not require project discovery.
+- `send-resolve-feedback` requires a **user-scoped account** token with **write** scope, **collab** permission on every project in the Resolve run, and AI features enabled. It does not require project discovery.
 
 If the server detects only `ROLLBAR_ACCESS_TOKEN` is set (no explicit account token), it makes a one-time, cached check against `GET /projects` to see whether that token is actually an account token; if so, account mode activates automatically. A single project-scoped token continues to work exactly as before.
 
@@ -274,6 +277,25 @@ The response is JSON text containing `task_session_id`, `agent_type` (`rca` or `
 The backend requires a personal account token with **read** scope, **view** access to the account and every project in the run, and the account's `ai-features-enabled` flag. A **403** indicates insufficient scope/access or disabled AI features. A **404** covers unknown, expired or other-account runs. Backend errors are returned as tool errors, not as run statuses.
 
 This tool requires the status endpoint from [mox #14555](https://github.com/rollbar/mox/pull/14555) and [moxapi #1277](https://github.com/rollbar/moxapi/pull/1277) to be deployed on the target API.
+
+#### Refine a Resolve run with feedback
+
+`send-resolve-feedback(task_session_id, content)`: Send feedback through `POST /agent_tasks/{task_session_id}/feedback` to refine an existing Resolve pull request. Supply the **Resolve run's session ID** and a **nonblank string**. Surrounding whitespace is trimmed; internal whitespace and line breaks are preserved.
+
+Example arguments:
+
+```json
+{
+  "task_session_id": "<existing Resolve run ID>",
+  "content": "Use approach B and cover the retry path."
+}
+```
+
+The response is JSON text containing `{ "task_session_id": "<same Resolve run ID>", "feedback_id": "<feedback entry ID>" }`. The continuation uses the **same run**, so call `get-agent-task-status` with that session ID to follow its progress. This tool submits feedback once; it does not wait for completion or poll. The backend determines whether the run can accept feedback and requires the token's user to have **collab** access to **every project** in the run, plus `ai-features-enabled` on the account.
+
+Feedback can consume credits and update the existing pull request. This is a non-idempotent write with no automatic retries. Backend errors are preserved, including invalid content (400), authentication/access or disabled AI features (401/403), unavailable Resolve runs (404), duplicate continuations (409), ineligible runs/PRs or insufficient credits (422), and continuation delivery failures (503). For the documented delivery-failure 503, an explicit retry with the same user, run and feedback can reuse the pending feedback entry; other uncertain outcomes should be checked before retrying.
+
+This tool requires the feedback endpoint from [mox #14563](https://github.com/rollbar/mox/pull/14563) and [moxapi #1281](https://github.com/rollbar/moxapi/pull/1281) to be deployed on the target API.
 
 ## How to Use
 

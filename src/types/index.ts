@@ -9,6 +9,11 @@ export interface RollbarAgentTaskStartResponse {
   task_session_id: string;
 }
 
+export interface RollbarResolveFeedbackResponse {
+  task_session_id: string;
+  feedback_id: string;
+}
+
 export const AGENT_TASK_STATUSES = [
   "queued",
   "running",
