@@ -15,15 +15,26 @@ function isValidApiBase(
     const url = new URL(value);
     if (url.username || url.password || url.search || url.hash) return false;
 
-    if (source === "file") {
-      return url.protocol === "https:" && url.hostname.endsWith(".rollbar.com");
+    const isLoopback = ["localhost", "127.0.0.1", "[::1]"].includes(
+      url.hostname,
+    );
+    if (
+      url.protocol !== "https:" &&
+      !(url.protocol === "http:" && isLoopback)
+    ) {
+      return false;
     }
 
-    return (
-      url.protocol === "https:" ||
-      (url.protocol === "http:" &&
-        ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname))
-    );
+    if (source === "file") {
+      return (
+        isLoopback ||
+        url.hostname.endsWith(".rollbar.com") ||
+        url.hostname === "api-staging.rollbardev.com" ||
+        /^dev\d{2}-moxapi\.rollbar\.dev$/.test(url.hostname)
+      );
+    }
+
+    return true;
   } catch {
     return false;
   }
@@ -31,10 +42,9 @@ function isValidApiBase(
 
 const FileApiBaseSchema = z
   .string()
-  .url()
   .refine(
     (value) => isValidApiBase(value, "file"),
-    "File apiBase must be an HTTPS URL on a rollbar.com subdomain without credentials, query or fragment",
+    "File apiBase must use HTTPS on a rollbar.com subdomain, api-staging.rollbardev.com or devNN-moxapi.rollbar.dev, or HTTP(S) on localhost, 127.0.0.1 or ::1, without credentials, query or fragment",
   );
 
 const ProjectConfigSchema = z
@@ -77,7 +87,10 @@ const RollbarMcpConfigAccountOrUserSchema = z
     apiBase: FileApiBaseSchema.optional(),
   })
   .passthrough()
-  .refine((value) => Boolean(value.accountToken || value.userToken))
+  .refine((value) => Boolean(value.accountToken || value.userToken), {
+    message:
+      "Expected userToken or accountToken, or a token/projects configuration.",
+  })
   .refine((value) => !("projects" in value) && !("token" in value), {
     message:
       '"projects"/"token" are not allowed in an account-token-only config.',
@@ -182,9 +195,19 @@ function loadProjectsFromFile(filePath: string): LoadedFileConfig | null {
     };
   }
 
-  throw new Error(
-    `Invalid Rollbar config file "${filePath}": expected { "userToken": "..." }, { "accountToken": "..." }, a single-project config like { "token": "..." }, or a multi-project config like { "projects": [...] }.`,
-  );
+  // Report the schema matching the supplied shape, not missing fields from
+  // the alternatives. Only include schema paths and messages, never values.
+  const fields = json !== null && typeof json === "object" ? json : {};
+  const validationError =
+    "projects" in fields
+      ? multi.error
+      : "token" in fields
+        ? shorthand.error
+        : accountOrUser.error;
+  const details = validationError.issues
+    .map((issue) => `${issue.path.join(".") || "config"}: ${issue.message}`)
+    .join("; ");
+  throw new Error(`Invalid Rollbar config file "${filePath}": ${details}`);
 }
 
 function exitWithError(message: string): never {
@@ -220,14 +243,20 @@ interface ResolvedConfig {
   isLegacyEnvToken?: boolean;
 }
 
+function resolveConfigFilePath(value: string): string {
+  if (path.isAbsolute(value)) return value;
+  if (value.startsWith("~/")) return path.join(homedir(), value.slice(2));
+  throw new Error(
+    "ROLLBAR_CONFIG_FILE must be an absolute path or start with ~/ (the user's home directory). Relative paths are not supported.",
+  );
+}
+
 function loadConfig(): ResolvedConfig {
   // 1. ROLLBAR_CONFIG_FILE env var
   const configFileEnv = process.env.ROLLBAR_CONFIG_FILE?.trim();
   if (configFileEnv) {
-    const resolved = path.isAbsolute(configFileEnv)
-      ? configFileEnv
-      : path.resolve(process.cwd(), configFileEnv);
     try {
+      const resolved = resolveConfigFilePath(configFileEnv);
       const loaded = loadProjectsFromFile(resolved);
       if (loaded) {
         return {

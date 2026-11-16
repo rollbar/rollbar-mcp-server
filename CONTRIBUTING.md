@@ -38,7 +38,7 @@ In your Claude Code MCP config (e.g. `.mcp.json`):
 }
 ```
 
-To use a config file instead, set `"ROLLBAR_CONFIG_FILE": "/path/to/.rollbar-mcp.json"` in `env` (or omit it to use `~/.rollbar-mcp.json`). Keep all tokens and the endpoint in the same configuration source. Custom endpoints require environment-only configuration: supply the token and `ROLLBAR_API_BASE` in `env` and ensure no config file is selected or present in your home directory. HTTPS is required except for local development on `localhost`, `127.0.0.1` or `::1`.
+To use a config file instead, set `"ROLLBAR_CONFIG_FILE": "/path/to/.rollbar-mcp.json"` in `env` (or omit it to use `~/.rollbar-mcp.json`). Explicit paths must be absolute or start with `~/`, which is expanded from your home directory. Keep all tokens and the endpoint in the same configuration source. Files support HTTPS endpoints on `rollbar.com` subdomains, `api-staging.rollbardev.com`, and `devNN-moxapi.rollbar.dev` (two digits), plus HTTP(S) on `localhost`, `127.0.0.1` or `::1`. Other custom HTTPS endpoints require environment-only configuration: supply the token and `ROLLBAR_API_BASE` in `env` and ensure no config file is selected or present in your home directory.
 
 ### Run your local installation from your IDE
 
@@ -92,7 +92,7 @@ You can use `ROLLBAR_CONFIG_FILE` in `env` instead of `ROLLBAR_ACCESS_TOKEN` for
 
 Build with `npm run build`, then set these environment variables before running the script:
 
-- `ROLLBAR_E2E_CONFIG_FILE`: absolute path to a local MCP config containing `userToken` (read and write scope), and `apiBase` if using staging. Do not commit this file.
+- `ROLLBAR_E2E_CONFIG_FILE`: absolute path to a local MCP config containing `userToken` (read and write scope), and `apiBase` if using staging (for example, `https://api-staging.rollbardev.com/api/1`) or local development. Do not commit this file.
 - `ROLLBAR_E2E_PROJECT`: the test project's name or numeric ID.
 - `ROLLBAR_E2E_ITEM_ID`: the test item's global ID, not its counter.
 - `ROLLBAR_E2E_USER_ID`: the expected token owner's numeric Rollbar user ID.

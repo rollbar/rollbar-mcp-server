@@ -187,7 +187,7 @@ describe("Resolve feedback over MCP", () => {
     files.read.mockReturnValue(
       JSON.stringify({
         userToken: "file-personal-token",
-        apiBase: "https://api.rollbar.com/api/1/",
+        apiBase: "https://api-staging.rollbardev.com/api/1/",
         projects: [
           { name: "one", token: "project-one" },
           { name: "two", token: "project-two" },
@@ -199,7 +199,7 @@ describe("Resolve feedback over MCP", () => {
     expect((await call()).isError).toBeFalsy();
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock.mock.calls[0][0]).toBe(
-      "https://api.rollbar.com/api/1/agent_tasks/resolve-run/feedback",
+      "https://api-staging.rollbardev.com/api/1/agent_tasks/resolve-run/feedback",
     );
     expect(fetchMock.mock.calls[0][1].headers["X-Rollbar-Access-Token"]).toBe(
       "file-personal-token",

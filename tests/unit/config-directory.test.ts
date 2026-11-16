@@ -70,6 +70,50 @@ afterEach(() => {
 });
 
 describe("working-directory configuration", () => {
+  it.each(["~/.rollbar-mcp.json", "~//.rollbar-mcp.json"])(
+    "expands %s to the user's home even when the repo contains a tilde directory",
+    async (location) => {
+      mkdirSync("~");
+      writeFileSync(
+        "~/.rollbar-mcp.json",
+        JSON.stringify({ userToken: "repo-user" }),
+      );
+      writeFileSync(
+        path.join(fixtures.home, ".rollbar-mcp.json"),
+        JSON.stringify({ userToken: "home-user" }),
+      );
+      vi.stubEnv("ROLLBAR_CONFIG_FILE", location);
+
+      const { resolveUserAuthContext } = await import("../../src/config.js");
+
+      expect(resolveUserAuthContext().token).toBe("home-user");
+      expect(process.exit).not.toHaveBeenCalled();
+      expect(fetch).not.toHaveBeenCalled();
+    },
+  );
+
+  it("fails when the ~/ file is missing instead of reading a repo's tilde directory", async () => {
+    mkdirSync("~");
+    writeFileSync(
+      "~/selected.json",
+      JSON.stringify({ userToken: "repo-user" }),
+    );
+    writeFileSync(
+      path.join(fixtures.home, ".rollbar-mcp.json"),
+      JSON.stringify({ userToken: "fallback-user" }),
+    );
+    vi.stubEnv("ROLLBAR_CONFIG_FILE", "~/selected.json");
+    vi.stubEnv("ROLLBAR_USER_ACCESS_TOKEN", "env-user");
+
+    await import("../../src/config.js");
+
+    expect(process.exit).toHaveBeenCalledWith(1);
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringContaining("was not found"),
+    );
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
   for (const filename of [".env", ".rollbar-mcp.json"]) {
     it.each(tokens)(`ignores ${filename} when using %s`, async (tokenName) => {
       const otherApi = "https://other.example/api/1";

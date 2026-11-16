@@ -67,7 +67,7 @@ Project-token configs are completely unchanged by this feature: if you don't set
 
 **Multiple Project: Config file**
 
-Create `~/.rollbar-mcp.json` in your home directory, or set `ROLLBAR_CONFIG_FILE` in your MCP client configuration to explicitly select a file. Prefer an absolute path. A checked-in template is available at `rollbar-mcp-example.json`; copy it to your selected location and fill in your tokens. Keep files containing real tokens out of source control.
+Create `~/.rollbar-mcp.json` in your home directory, or set `ROLLBAR_CONFIG_FILE` in your MCP client configuration to explicitly select a file. Use an absolute path or a path starting with `~/`, which the server expands from your home directory. Other relative paths are rejected. A checked-in template is available at `rollbar-mcp-example.json`; copy it to your selected location and fill in your tokens. Keep files containing real tokens out of source control.
 
 Single project shorthand:
 
@@ -94,7 +94,7 @@ Config file lookup order:
 
 The server does not automatically load `.env` or `.rollbar-mcp.json` from the working directory. Configure environment variables in your MCP client, or explicitly select a configuration file. If a selected file is missing or invalid, the server exits instead of falling back to another source.
 
-In files, `apiBase` must use HTTPS on a `rollbar.com` subdomain. For a custom endpoint, configure both the token and `ROLLBAR_API_BASE` through the MCP client environment, with no configuration file selected or present in your home directory. Environment endpoints require HTTPS, except that HTTP is supported for `localhost`, `127.0.0.1` and `::1` during local development. API base URLs cannot contain credentials, query parameters or fragments.
+In files, `apiBase` accepts HTTPS on `rollbar.com` subdomains, `api-staging.rollbardev.com`, and `devNN-moxapi.rollbar.dev` (where `NN` is two digits). Files and environment configuration also accept HTTP or HTTPS on `localhost`, `127.0.0.1` and `::1` for local development. For any other custom HTTPS endpoint, configure both the token and `ROLLBAR_API_BASE` through the MCP client environment, with no configuration file selected or present in your home directory. API base URLs cannot contain credentials, query parameters or fragments.
 
 Required scopes:
 

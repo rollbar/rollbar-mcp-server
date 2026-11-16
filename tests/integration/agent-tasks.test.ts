@@ -235,7 +235,7 @@ describe("agent task starts over MCP", () => {
       files.read.mockReturnValue(
         JSON.stringify({
           userToken: "file-user-token",
-          apiBase: "https://api.rollbar.com/api/1/",
+          apiBase: "https://api-staging.rollbardev.com/api/1/",
           projects: [
             { name: "Backend", token: "project-token-1" },
             { name: "Frontend", token: "project-token-2" },
@@ -247,7 +247,7 @@ describe("agent task starts over MCP", () => {
       expect((await call(name, args)).isError).toBeFalsy();
       expect(fetchMock).toHaveBeenCalledTimes(1);
       expect(fetchMock.mock.calls[0][0]).toMatch(
-        /^https:\/\/api\.rollbar\.com\/api\/1\/agent_tasks\//,
+        /^https:\/\/api-staging\.rollbardev\.com\/api\/1\/agent_tasks\//,
       );
       expect(fetchMock.mock.calls[0][1].headers["X-Rollbar-Access-Token"]).toBe(
         "file-user-token",
