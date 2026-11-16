@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 
-import "./load-env.js";
 import "./utils/proxy.js";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";

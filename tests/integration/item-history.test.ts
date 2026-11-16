@@ -7,7 +7,6 @@ import { ITEM_EVENT_TYPES } from "../../src/types/index.js";
 
 // Exercise the real MCP schemas, handlers, auth, and HTTP client. Only the
 // configuration files and external Rollbar responses are replaced.
-vi.mock("dotenv", () => ({ default: { config: vi.fn() } }));
 vi.mock("node:fs", () => ({ existsSync: () => false, readFileSync: vi.fn() }));
 
 const apiBase = "https://rollbar.example/api/1";

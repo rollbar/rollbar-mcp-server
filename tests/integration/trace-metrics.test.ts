@@ -8,7 +8,6 @@ import { CallToolResultSchema } from "@modelcontextprotocol/sdk/types.js";
 // cover the request, paging, project selection and error handling in depth.
 // These cover what differs for the traces table, and that the shared behavior
 // reaches it.
-vi.mock("dotenv", () => ({ default: { config: vi.fn() } }));
 vi.mock("node:fs", () => ({ existsSync: () => false, readFileSync: vi.fn() }));
 
 const apiBase = "https://rollbar.example/api/1";

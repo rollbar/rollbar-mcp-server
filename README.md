@@ -26,7 +26,7 @@ Use **read** scope for reads, or **read and write** to post comments. The MCP re
 
 User mode sends every request with the configured user's token, including when per-project tokens are also present. Comment authorship comes from that token; you cannot supply a different author. The backend marks posted comments with `via_api: true` and handles normal subscriptions and notifications.
 
-Configure exactly one of `userToken` / `ROLLBAR_USER_ACCESS_TOKEN` or `accountToken` / `ROLLBAR_ACCOUNT_ACCESS_TOKEN`. Configuring both fails at startup, including when one comes from a file and the other from the environment. A file value overrides the environment value for the same token type. `apiBase` in a file or `ROLLBAR_API_BASE` in environment-only configuration selects a custom API endpoint.
+Configure exactly one of `userToken` or `accountToken` in a file, or one of `ROLLBAR_USER_ACCESS_TOKEN` or `ROLLBAR_ACCOUNT_ACCESS_TOKEN` in the environment. Configuring both token types in the selected source fails at startup. A selected file supplies the entire configuration; its credentials and API endpoint are not merged with environment values.
 
 Use `list-projects` to find the project name or numeric ID for the tools' `project` argument. It is optional when your user token can see exactly one enabled project. A token supplied only through the legacy `ROLLBAR_ACCESS_TOKEN` setting is not inferred to be a user token; set `ROLLBAR_USER_ACCESS_TOKEN` explicitly for posting comments or starting agent tasks.
 
@@ -67,7 +67,7 @@ Project-token configs are completely unchanged by this feature: if you don't set
 
 **Multiple Project: Config file**
 
-Create `.rollbar-mcp.json` in your working directory or home directory, or set `ROLLBAR_CONFIG_FILE` to point to a custom path. A checked-in template is available at `rollbar-mcp-example.json`; copy it to `.rollbar-mcp.json` and fill in your real tokens.
+Create `~/.rollbar-mcp.json` in your home directory, or set `ROLLBAR_CONFIG_FILE` in your MCP client configuration to explicitly select a file. Prefer an absolute path. A checked-in template is available at `rollbar-mcp-example.json`; copy it to your selected location and fill in your tokens. Keep files containing real tokens out of source control.
 
 Single project shorthand:
 
@@ -89,11 +89,12 @@ Multiple projects:
 Config file lookup order:
 
 1. `ROLLBAR_CONFIG_FILE` env var
-2. `.rollbar-mcp.json` in current working directory
-3. `~/.rollbar-mcp.json` in home directory
-4. `ROLLBAR_ACCESS_TOKEN`, `ROLLBAR_ACCOUNT_ACCESS_TOKEN`, or `ROLLBAR_USER_ACCESS_TOKEN` env var
+2. `~/.rollbar-mcp.json` in home directory
+3. `ROLLBAR_ACCESS_TOKEN`, `ROLLBAR_ACCOUNT_ACCESS_TOKEN`, or `ROLLBAR_USER_ACCESS_TOKEN` env var
 
-If a config file exists but is invalid, the server exits with an error instead of falling back to a lower-priority config source.
+The server does not automatically load `.env` or `.rollbar-mcp.json` from the working directory. Configure environment variables in your MCP client, or explicitly select a configuration file. If a selected file is missing or invalid, the server exits instead of falling back to another source.
+
+In files, `apiBase` must use HTTPS on a `rollbar.com` subdomain. For a custom endpoint, configure both the token and `ROLLBAR_API_BASE` through the MCP client environment, with no configuration file selected or present in your home directory. Environment endpoints require HTTPS, except that HTTP is supported for `localhost`, `127.0.0.1` and `::1` during local development. API base URLs cannot contain credentials, query parameters or fragments.
 
 Required scopes:
 

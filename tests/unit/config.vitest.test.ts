@@ -1,11 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
-vi.mock("dotenv", () => ({
-  default: {
-    config: vi.fn(),
-  },
-}));
-
 const existsSyncMock = vi.fn();
 const readFileSyncMock = vi.fn();
 vi.mock("node:fs", () => ({
@@ -92,27 +86,20 @@ describe("config", () => {
     await import("../../src/config.js");
 
     expect(console.error).toHaveBeenCalledWith(
-      "Error: ROLLBAR_API_BASE must be a valid HTTP(S) URL when using ROLLBAR_ACCESS_TOKEN.",
+      expect.stringContaining("ROLLBAR_API_BASE must be an HTTPS URL"),
     );
     expect(process.exit).toHaveBeenCalledWith(1);
-  });
-
-  it("should call dotenv.config() on module load", async () => {
-    const dotenv = await import("dotenv");
-    vi.clearAllMocks();
-
-    await import("../../src/config.js");
-
-    expect(dotenv.default.config).toHaveBeenCalled();
   });
 
   it("loads JSON config from ROLLBAR_CONFIG_FILE path", async () => {
     process.env.ROLLBAR_CONFIG_FILE = "/custom/config.json";
     delete process.env.ROLLBAR_ACCESS_TOKEN;
-    existsSyncMock.mockImplementation((p: string) => p === "/custom/config.json");
+    existsSyncMock.mockImplementation(
+      (p: string) => p === "/custom/config.json",
+    );
     readFileSyncMock.mockReturnValue(
       JSON.stringify({
-        apiBase: "https://api.example.com/api/1",
+        apiBase: "https://api.rollbar.com/api/1",
         projects: [
           {
             name: "backend",
@@ -128,20 +115,24 @@ describe("config", () => {
     expect(PROJECTS).toHaveLength(1);
     expect(PROJECTS[0].name).toBe("backend");
     expect(PROJECTS[0].token).toBe("tok_abc");
-    expect(PROJECTS[0].apiBase).toBe("https://api.example.com/api/1");
+    expect(PROJECTS[0].apiBase).toBe("https://api.rollbar.com/api/1");
   });
 
   it("should exit when ROLLBAR_CONFIG_FILE points to invalid JSON", async () => {
     process.env.ROLLBAR_CONFIG_FILE = "/custom/config.json";
     delete process.env.ROLLBAR_ACCESS_TOKEN;
-    existsSyncMock.mockImplementation((p: string) => p === "/custom/config.json");
+    existsSyncMock.mockImplementation(
+      (p: string) => p === "/custom/config.json",
+    );
     readFileSyncMock.mockReturnValue("{ invalid json");
     vi.resetModules();
 
     await import("../../src/config.js");
 
     expect(console.error).toHaveBeenCalledWith(
-      expect.stringContaining('Invalid Rollbar config file "/custom/config.json"'),
+      expect.stringContaining(
+        'Invalid Rollbar config file "/custom/config.json"',
+      ),
     );
     expect(process.exit).toHaveBeenCalledWith(1);
   });
@@ -249,9 +240,14 @@ describe("config", () => {
     expect(process.exit).toHaveBeenCalledWith(1);
   });
 
-  it("should exit when cwd config exists but is invalid instead of falling back to env", async () => {
-    existsSyncMock.mockImplementation((p: string) => p.endsWith(".rollbar-mcp.json"));
-    readFileSyncMock.mockReturnValue(JSON.stringify({ projects: "not-an-array" }));
+  it("should exit when explicitly selected config is invalid instead of falling back to env", async () => {
+    process.env.ROLLBAR_CONFIG_FILE = "/test/.rollbar-mcp.json";
+    existsSyncMock.mockImplementation((p: string) =>
+      p.endsWith(".rollbar-mcp.json"),
+    );
+    readFileSyncMock.mockReturnValue(
+      JSON.stringify({ projects: "not-an-array" }),
+    );
     vi.resetModules();
 
     await import("../../src/config.js");
@@ -280,7 +276,9 @@ describe("config", () => {
 
   it("should exit when shorthand and multi-project fields are both present", async () => {
     delete process.env.ROLLBAR_ACCESS_TOKEN;
-    existsSyncMock.mockImplementation((p: string) => p.endsWith(".rollbar-mcp.json"));
+    existsSyncMock.mockImplementation((p: string) =>
+      p.endsWith(".rollbar-mcp.json"),
+    );
     readFileSyncMock.mockReturnValue(
       JSON.stringify({
         token: "tok_single",

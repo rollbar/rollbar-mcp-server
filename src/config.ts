@@ -1,4 +1,3 @@
-import "./load-env.js";
 import { readFileSync, existsSync } from "node:fs";
 import path from "node:path";
 import { homedir } from "node:os";
@@ -8,17 +7,35 @@ import { getProjects, resolveProjectId } from "./utils/projects-cache.js";
 
 const DEFAULT_ROLLBAR_API_BASE = "https://api.rollbar.com/api/1";
 
-const HttpUrlSchema = z
+function isValidApiBase(
+  value: string,
+  source: "file" | "environment",
+): boolean {
+  try {
+    const url = new URL(value);
+    if (url.username || url.password || url.search || url.hash) return false;
+
+    if (source === "file") {
+      return url.protocol === "https:" && url.hostname.endsWith(".rollbar.com");
+    }
+
+    return (
+      url.protocol === "https:" ||
+      (url.protocol === "http:" &&
+        ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname))
+    );
+  } catch {
+    return false;
+  }
+}
+
+const FileApiBaseSchema = z
   .string()
   .url()
-  .refine((value) => {
-    try {
-      const parsedUrl = new URL(value);
-      return ["https:", "http:"].includes(parsedUrl.protocol);
-    } catch {
-      return false;
-    }
-  }, "Must be a valid HTTP(S) URL");
+  .refine(
+    (value) => isValidApiBase(value, "file"),
+    "File apiBase must be an HTTPS URL on a rollbar.com subdomain without credentials, query or fragment",
+  );
 
 const ProjectConfigSchema = z
   .object({
@@ -30,7 +47,7 @@ const ProjectConfigSchema = z
 const RollbarMcpConfigSchema = z
   .object({
     projects: z.array(ProjectConfigSchema).min(1),
-    apiBase: HttpUrlSchema.optional(),
+    apiBase: FileApiBaseSchema.optional(),
     accountToken: z.string().min(1).optional(),
     userToken: z.string().min(1).optional(),
   })
@@ -43,7 +60,7 @@ const RollbarMcpConfigSchema = z
 const RollbarMcpConfigShorthandSchema = z
   .object({
     token: z.string().min(1),
-    apiBase: HttpUrlSchema.optional(),
+    apiBase: FileApiBaseSchema.optional(),
     accountToken: z.string().min(1).optional(),
     userToken: z.string().min(1).optional(),
   })
@@ -57,7 +74,7 @@ const RollbarMcpConfigAccountOrUserSchema = z
   .object({
     accountToken: z.string().min(1).optional(),
     userToken: z.string().min(1).optional(),
-    apiBase: HttpUrlSchema.optional(),
+    apiBase: FileApiBaseSchema.optional(),
   })
   .passthrough()
   .refine((value) => Boolean(value.accountToken || value.userToken))
@@ -90,15 +107,7 @@ function resolveApiBaseFromEnv(): string | null {
   if (sanitizedValue.length === 0) {
     return null;
   }
-  try {
-    const parsedUrl = new URL(sanitizedValue);
-    if (!["https:", "http:"].includes(parsedUrl.protocol)) {
-      return null;
-    }
-    return sanitizedValue;
-  } catch {
-    return null;
-  }
+  return isValidApiBase(sanitizedValue, "environment") ? sanitizedValue : null;
 }
 
 function normalizeApiBase(value: string | undefined): string {
@@ -184,15 +193,11 @@ function exitWithError(message: string): never {
   return undefined as never;
 }
 
-function resolveAccountCredentials(
-  config: { accountToken?: string; userToken?: string } = {},
-): { accountToken?: string; userToken?: string } {
-  const accountToken =
-    config.accountToken ??
-    (process.env.ROLLBAR_ACCOUNT_ACCESS_TOKEN?.trim() || undefined);
-  const userToken =
-    config.userToken ??
-    (process.env.ROLLBAR_USER_ACCESS_TOKEN?.trim() || undefined);
+function resolveAccountCredentials(config: {
+  accountToken?: string;
+  userToken?: string;
+}): { accountToken?: string; userToken?: string } {
+  const { accountToken, userToken } = config;
   if (accountToken && userToken) {
     throw new Error(
       "Configure exactly one of accountToken / ROLLBAR_ACCOUNT_ACCESS_TOKEN or userToken / ROLLBAR_USER_ACCESS_TOKEN, not both.",
@@ -207,7 +212,7 @@ interface ResolvedConfig {
   userToken?: string;
   apiBase: string;
   // True only when the single project in `projects` came from the legacy
-  // ROLLBAR_ACCESS_TOKEN env var (loadConfig() step 4), as opposed to a
+  // ROLLBAR_ACCESS_TOKEN env var, as opposed to a
   // single-project config file/shorthand config. Only that legacy path
   // should ever trigger the lazy GET /projects probe — a single-project
   // config file is unambiguously project-token-only and must never make an
@@ -241,24 +246,8 @@ function loadConfig(): ResolvedConfig {
     );
   }
 
-  // 2. .rollbar-mcp.json in process.cwd()
-  const cwdPath = path.join(process.cwd(), ".rollbar-mcp.json");
-  try {
-    const fromCwd = loadProjectsFromFile(cwdPath);
-    if (fromCwd) {
-      return {
-        projects: fromCwd.projects,
-        ...resolveAccountCredentials(fromCwd),
-        apiBase: fromCwd.apiBase,
-      };
-    }
-  } catch (error) {
-    return exitWithError(
-      error instanceof Error ? error.message : "Invalid Rollbar config file",
-    );
-  }
-
-  // 3. ~/.rollbar-mcp.json
+  // 2. ~/.rollbar-mcp.json. A selected file supplies the entire configuration;
+  // credentials and API endpoints are never completed from another source.
   const homePath = path.join(homedir(), ".rollbar-mcp.json");
   try {
     const fromHome = loadProjectsFromFile(homePath);
@@ -275,11 +264,15 @@ function loadConfig(): ResolvedConfig {
     );
   }
 
-  // 4. Project, account, or user token environment variables.
+  // 3. Project, account, or user token environment variables.
   const token = process.env.ROLLBAR_ACCESS_TOKEN?.trim();
   let credentials: ReturnType<typeof resolveAccountCredentials>;
   try {
-    credentials = resolveAccountCredentials();
+    credentials = resolveAccountCredentials({
+      accountToken:
+        process.env.ROLLBAR_ACCOUNT_ACCESS_TOKEN?.trim() || undefined,
+      userToken: process.env.ROLLBAR_USER_ACCESS_TOKEN?.trim() || undefined,
+    });
   } catch (error) {
     return exitWithError((error as Error).message);
   }
@@ -288,7 +281,7 @@ function loadConfig(): ResolvedConfig {
     const apiBase = resolveApiBaseFromEnv();
     if (apiBase === null) {
       return exitWithError(
-        "Error: ROLLBAR_API_BASE must be a valid HTTP(S) URL when using ROLLBAR_ACCESS_TOKEN.",
+        "Error: ROLLBAR_API_BASE must be an HTTPS URL (HTTP is allowed only for localhost, 127.0.0.1 or ::1), without credentials, query or fragment.",
       );
     }
 
@@ -314,7 +307,7 @@ function loadConfig(): ResolvedConfig {
   }
 
   return exitWithError(
-    "Error: No Rollbar configuration found. Set ROLLBAR_USER_ACCESS_TOKEN, ROLLBAR_ACCESS_TOKEN or ROLLBAR_ACCOUNT_ACCESS_TOKEN, or create .rollbar-mcp.json (in cwd or home), or set ROLLBAR_CONFIG_FILE.",
+    "Error: No Rollbar configuration found. Set ROLLBAR_USER_ACCESS_TOKEN, ROLLBAR_ACCESS_TOKEN or ROLLBAR_ACCOUNT_ACCESS_TOKEN, or create ~/.rollbar-mcp.json, or set ROLLBAR_CONFIG_FILE.",
   );
 }
 

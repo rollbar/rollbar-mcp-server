@@ -17,7 +17,7 @@ You can run the server directly to confirm it starts (it will wait for stdin; Ct
 node build/index.js
 ```
 
-For local development, configure Rollbar either with an environment variable or a config file. Create `.rollbar-mcp.json` in the project root (or set `ROLLBAR_CONFIG_FILE` to its path) for single- or multi-project config—see the README Configuration section.
+For local development, configure Rollbar through environment variables in your MCP client or a config file. Use `~/.rollbar-mcp.json`, or explicitly select a file with `ROLLBAR_CONFIG_FILE`. Files in the working directory are not loaded automatically—see the README Configuration section.
 
 ### Run your local installation from Claude Code
 
@@ -38,7 +38,7 @@ In your Claude Code MCP config (e.g. `.mcp.json`):
 }
 ```
 
-To use a config file instead, set `"ROLLBAR_CONFIG_FILE": "/path/to/.rollbar-mcp.json"` in `env` (or omit it if `.rollbar-mcp.json` is in the project root or your home directory). Add `ROLLBAR_API_BASE` to `env` if you need a custom Rollbar API endpoint (e.g. `"ROLLBAR_API_BASE": "https://rollbar-dev.example.com/api/1"`).
+To use a config file instead, set `"ROLLBAR_CONFIG_FILE": "/path/to/.rollbar-mcp.json"` in `env` (or omit it to use `~/.rollbar-mcp.json`). Keep all tokens and the endpoint in the same configuration source. Custom endpoints require environment-only configuration: supply the token and `ROLLBAR_API_BASE` in `env` and ensure no config file is selected or present in your home directory. HTTPS is required except for local development on `localhost`, `127.0.0.1` or `::1`.
 
 ### Run your local installation from your IDE
 
@@ -85,6 +85,10 @@ In your `.vscode/mcp.json`:
 You can use `ROLLBAR_CONFIG_FILE` in `env` instead of `ROLLBAR_ACCESS_TOKEN` for config-file-based setup.
 
 ## Testing
+
+### Local configuration check
+
+`npm run test:e2e:local-config` builds the server and exercises it over stdio using temporary directories, fictitious tokens and local HTTP fixtures. It covers source selection, endpoint validation and proxy settings. A test-only transport maps the default API origin to localhost and blocks external connections; no Rollbar service or real credential is used.
 
 ### Live item history and comment check
 
