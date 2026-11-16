@@ -3,6 +3,7 @@ import type {
   RollbarAgentTaskStartResponse,
   RollbarAgentTaskStatusResponse,
   RollbarApiResponse,
+  RollbarResolveFeedbackResponse,
 } from "../types/index.js";
 import { AGENT_TASK_STATUSES } from "../types/index.js";
 import { makeRollbarRequest } from "./api.js";
@@ -68,6 +69,39 @@ export async function getAgentTaskStatus(
     !AGENT_TASK_STATUSES.includes(result.status)
   ) {
     throw new Error("Invalid Rollbar API response: invalid agent task status");
+  }
+  return result;
+}
+
+/** Submit feedback once; callers decide whether to retry a failed delivery. */
+export async function sendResolveFeedback(
+  taskSessionId: string,
+  content: string,
+): Promise<RollbarResolveFeedbackResponse> {
+  const auth = resolveUserAuthContext("write");
+  const response = await makeRollbarRequest<
+    RollbarApiResponse<RollbarResolveFeedbackResponse>
+  >(
+    `${auth.apiBase}/agent_tasks/${encodeURIComponent(taskSessionId)}/feedback`,
+    "send-resolve-feedback",
+    auth.token,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ content }),
+    },
+  );
+  const result = getRollbarResult(response, "Resolve feedback");
+  if (
+    typeof result !== "object" ||
+    Array.isArray(result) ||
+    result.task_session_id !== taskSessionId ||
+    typeof result.feedback_id !== "string" ||
+    result.feedback_id.trim().length === 0
+  ) {
+    throw new Error(
+      "Invalid Rollbar API response: invalid Resolve feedback result",
+    );
   }
   return result;
 }
