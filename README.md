@@ -22,7 +22,7 @@ Use **read** scope for reads, or **read and write** to post comments. The MCP re
 
 `get-agent-task-status` requires **read** scope and the user's **view** permission on the account and every project in the run. It uses the session ID directly without project discovery. Project tokens and ordinary account-wide tokens cannot read these runs. Configure a personal token with **read and write** scope to both start runs and check their results.
 
-`send-resolve-feedback` requires **write** scope, **collab** permission on every project in the Resolve run, and the account's `ai-features-enabled` flag. It uses the existing run ID without project discovery. Use a personal token with **read and write** scope to submit feedback and then check progress.
+`send-resolve-feedback` requires **write** scope, **collab** permission on every project in the Resolve run, and AI features enabled for the account. It uses the existing run ID without project discovery. Use a personal token with **read and write** scope to submit feedback and then check progress.
 
 User mode sends every request with the configured user's token, including when per-project tokens are also present. Comment authorship comes from that token; you cannot supply a different author. The backend marks posted comments with `via_api: true` and handles normal subscriptions and notifications.
 
@@ -260,8 +260,6 @@ Both tools return JSON text containing `{ "task_session_id": "<new task session 
 
 Starting tasks consumes credits. Both tools are non-idempotent writes and do not retry failures automatically. If a response is lost, check the task state in Rollbar before retrying. Backend error messages are preserved, including authentication/permissions (401/403), invalid input (400), unavailable RCA runs (404), active-task conflicts (409), and service validation such as insufficient credits (422).
 
-These tools require the public agent-task endpoints from [mox #14547](https://github.com/rollbar/mox/pull/14547) and [moxapi #1273](https://github.com/rollbar/moxapi/pull/1273) to be deployed on the target API. To test a branch deployment, set `apiBase` in the config file or `ROLLBAR_API_BASE` in environment-only configuration.
-
 #### Check RCA and Resolve status
 
 `get-agent-task-status(task_session_id)`: Read an RCA or Resolve run through `GET /agent_tasks/{task_session_id}`. Supply the session ID returned by `start-rca` or `start-resolve`, as a nonblank string. This is a read-only, idempotent tool with no `project` argument. It makes one request per call; call it again later to poll for completion.
@@ -274,9 +272,7 @@ Example arguments:
 
 The response is JSON text containing `task_session_id`, `agent_type` (`rca` or `resolve`) and `status` (`queued`, `running`, `blocked`, `canceling`, `finished`, `failed` or `canceled`). Results are absent until the run finishes. A finished RCA exposes `rca_results.results.root_cause` when available; a finished Resolve exposes `resolve_results.pull_request_url`. Finished result fields can be `null` when no output was recorded. A failed run may include `failure_reason` with `agent_failure_code` and/or `message`. All additional result fields are preserved.
 
-The backend requires a personal account token with **read** scope, **view** access to the account and every project in the run, and the account's `ai-features-enabled` flag. A **403** indicates insufficient scope/access or disabled AI features. A **404** covers unknown, expired or other-account runs. Backend errors are returned as tool errors, not as run statuses.
-
-This tool requires the status endpoint from [mox #14555](https://github.com/rollbar/mox/pull/14555) and [moxapi #1277](https://github.com/rollbar/moxapi/pull/1277) to be deployed on the target API.
+The backend requires a personal account token with **read** scope, **view** access to the account and every project in the run, and AI features enabled for the account. A **403** indicates insufficient scope/access or disabled AI features. A **404** covers unknown, expired or other-account runs. Backend errors are returned as tool errors, not as run statuses.
 
 #### Refine a Resolve run with feedback
 
@@ -291,11 +287,9 @@ Example arguments:
 }
 ```
 
-The response is JSON text containing `{ "task_session_id": "<same Resolve run ID>", "feedback_id": "<feedback entry ID>" }`. The continuation uses the **same run**, so call `get-agent-task-status` with that session ID to follow its progress. This tool submits feedback once; it does not wait for completion or poll. The backend determines whether the run can accept feedback and requires the token's user to have **collab** access to **every project** in the run, plus `ai-features-enabled` on the account.
+The response is JSON text containing `{ "task_session_id": "<same Resolve run ID>", "feedback_id": "<feedback entry ID>" }`. The continuation uses the **same run**, so call `get-agent-task-status` with that session ID to follow its progress. This tool submits feedback once; it does not wait for completion or poll. The backend determines whether the run can accept feedback and requires the token's user to have **collab** access to **every project** in the run, plus AI features enabled for the account.
 
-Feedback can consume credits and update the existing pull request. This is a non-idempotent write with no automatic retries. Backend errors are preserved, including invalid content (400), authentication/access or disabled AI features (401/403), unavailable Resolve runs (404), duplicate continuations (409), ineligible runs/PRs or insufficient credits (422), and continuation delivery failures (503). For the documented delivery-failure 503, an explicit retry with the same user, run and feedback can reuse the pending feedback entry; other uncertain outcomes should be checked before retrying.
-
-This tool requires the feedback endpoint from [mox #14563](https://github.com/rollbar/mox/pull/14563) and [moxapi #1281](https://github.com/rollbar/moxapi/pull/1281) to be deployed on the target API.
+Feedback can consume credits and update the existing pull request. This is a non-idempotent write with no automatic retries. Backend errors are preserved, including invalid content (400), authentication/access or disabled AI features (401/403), unavailable Resolve runs (404), duplicate continuations (409), ineligible runs/PRs or insufficient credits (422), and service unavailability (503). If the outcome is uncertain, check the run's status before retrying.
 
 ## How to Use
 
