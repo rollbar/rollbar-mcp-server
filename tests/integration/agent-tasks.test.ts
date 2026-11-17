@@ -17,15 +17,28 @@ const apiBase = "https://rollbar.example/api/1";
 const starts = [
   { name: "start-rca", kind: "rca", args: { source_occurrence_id: "123456" } },
   {
+    name: "start-rca",
+    kind: "rca",
+    args: { project_slug: "example-project", item_counter: 27024 },
+  },
+  {
     name: "start-resolve",
     kind: "resolve",
     args: { rca_task_session_id: "rca-session" },
   },
 ];
 
-function ok(taskSessionId = "new-session") {
+function ok(taskSessionId = "new-session", sourceOccurrenceId?: string) {
   return new Response(
-    JSON.stringify({ err: 0, result: { task_session_id: taskSessionId } }),
+    JSON.stringify({
+      err: 0,
+      result: {
+        task_session_id: taskSessionId,
+        ...(sourceOccurrenceId === undefined
+          ? {}
+          : { source_occurrence_id: sourceOccurrenceId }),
+      },
+    }),
   );
 }
 
@@ -90,18 +103,31 @@ describe("agent task starts over MCP", () => {
       });
       expect(tool?.inputSchema.properties).not.toHaveProperty("project");
     }
+    const rca = tools.find((entry) => entry.name === "start-rca");
+    expect(rca?.inputSchema.properties).toMatchObject({
+      source_occurrence_id: { type: "string" },
+      project_slug: { type: "string" },
+      item_counter: { type: "integer", minimum: 1 },
+      continue_with_resolve: { type: "boolean", default: false },
+    });
+    expect(rca?.inputSchema.required ?? []).not.toContain(
+      "source_occurrence_id",
+    );
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it.each(starts)(
     "starts $kind with one authenticated JSON POST and returns its session",
     async ({ name, kind, args }) => {
-      fetchMock.mockResolvedValueOnce(ok());
+      fetchMock.mockResolvedValueOnce(
+        ok("new-session", kind === "rca" ? "123456" : undefined),
+      );
       await connect();
       const result = await call(name, args);
       expect(result.isError).toBeFalsy();
       expect(JSON.parse(result.text)).toEqual({
         task_session_id: "new-session",
+        ...(kind === "rca" ? { source_occurrence_id: "123456" } : {}),
       });
       expect(fetchMock).toHaveBeenCalledExactlyOnceWith(
         `${apiBase}/agent_tasks/${kind}`,
@@ -121,34 +147,76 @@ describe("agent task starts over MCP", () => {
     },
   );
 
-  it.each([false, true])(
-    "forwards explicit continue_with_resolve=%s",
-    async (continueWithResolve) => {
-      fetchMock.mockResolvedValueOnce(ok());
+  it("accepts a legacy occurrence-based RCA success with only the task session ID", async () => {
+    fetchMock.mockResolvedValueOnce(ok("legacy-session"));
+    await connect();
+    const result = await call("start-rca", { source_occurrence_id: "123456" });
+    expect(result.isError).toBeFalsy();
+    expect(JSON.parse(result.text)).toEqual({
+      task_session_id: "legacy-session",
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({
+      source_occurrence_id: "123456",
+      continue_with_resolve: false,
+    });
+  });
+
+  it.each([null, "", " \n\t", 123456])(
+    "rejects a malformed occurrence ID when a legacy-form response includes it: %j",
+    async (sourceOccurrenceId) => {
+      fetchMock.mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            err: 0,
+            result: {
+              task_session_id: "new-session",
+              source_occurrence_id: sourceOccurrenceId,
+            },
+          }),
+        ),
+      );
       await connect();
-      expect(
-        (
-          await call("start-rca", {
-            source_occurrence_id: "123456",
-            continue_with_resolve: continueWithResolve,
-          })
-        ).isError,
-      ).toBeFalsy();
-      expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({
+      const result = await call("start-rca", {
         source_occurrence_id: "123456",
-        continue_with_resolve: continueWithResolve,
       });
+      expect(result.isError).toBe(true);
+      expect(result.text).toContain("source occurrence ID");
+      expect(fetchMock).toHaveBeenCalledTimes(1);
     },
   );
+
+  describe.each([
+    { source_occurrence_id: "123456" },
+    { project_slug: "example-project", item_counter: 27024 },
+  ])("RCA source %j", (source) => {
+    it.each([false, true])(
+      "forwards explicit continue_with_resolve=%s",
+      async (continueWithResolve) => {
+        fetchMock.mockResolvedValueOnce(ok("new-session", "123456"));
+        await connect();
+        const result = await call("start-rca", {
+          ...source,
+          continue_with_resolve: continueWithResolve,
+        });
+        expect(result.isError).toBeFalsy();
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+        expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({
+          ...source,
+          continue_with_resolve: continueWithResolve,
+        });
+      },
+    );
+  });
 
   it.each(["18446744073709551615", "0123456789abcdef0123456789abcdef"])(
     "preserves opaque occurrence ID %s without numeric conversion",
     async (id) => {
-      fetchMock.mockResolvedValueOnce(ok());
+      fetchMock.mockResolvedValueOnce(ok("new-session", id));
       await connect();
-      expect(
-        (await call("start-rca", { source_occurrence_id: id })).isError,
-      ).toBeFalsy();
+      const result = await call("start-rca", { source_occurrence_id: id });
+      expect(result.isError).toBeFalsy();
+      expect(JSON.parse(result.text).source_occurrence_id).toBe(id);
       expect(
         JSON.parse(fetchMock.mock.calls[0][1].body).source_occurrence_id,
       ).toBe(id);
@@ -177,7 +245,7 @@ describe("agent task starts over MCP", () => {
     });
   });
 
-  it.each(starts)(
+  it.each(starts.filter(({ args }) => !("project_slug" in args)))(
     "rejects invalid $kind IDs before HTTP",
     async ({ name, args }) => {
       await connect();
@@ -198,6 +266,78 @@ describe("agent task starts over MCP", () => {
     expect(result.text).toContain("source_occurrence_id");
     expect(fetchMock).not.toHaveBeenCalled();
   });
+
+  it.each([
+    {},
+    { project_slug: "example-project" },
+    { item_counter: 27024 },
+    { source_occurrence_id: "123456", project_slug: "example-project" },
+    { source_occurrence_id: "123456", item_counter: 27024 },
+    {
+      source_occurrence_id: "123456",
+      project_slug: "example-project",
+      item_counter: 27024,
+    },
+  ])("rejects missing, incomplete or mixed RCA sources: %j", async (args) => {
+    fetchMock.mockResolvedValueOnce(ok("new-session", "123456"));
+    await connect();
+    const result = await call("start-rca", args);
+    expect(result.isError).toBe(true);
+    expect(result.text).toContain("source_occurrence_id");
+    expect(result.text).toContain("project_slug");
+    expect(result.text).toContain("item_counter");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { project_slug: "" },
+    { project_slug: " \n\t" },
+    { project_slug: null },
+    { project_slug: 123 },
+    { item_counter: null },
+    { item_counter: "27024" },
+    { item_counter: true },
+    { item_counter: 0 },
+    { item_counter: -1 },
+    { item_counter: 1.5 },
+    { item_counter: Number.MAX_SAFE_INTEGER + 1 },
+  ])("rejects invalid RCA item identifiers: %j", async (invalid) => {
+    await connect();
+    const result = await call("start-rca", {
+      project_slug: "example-project",
+      item_counter: 27024,
+      ...invalid,
+    });
+    expect(result.isError).toBe(true);
+    expect(result.text).toContain(Object.keys(invalid)[0]);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it.each([undefined, null, "", " \n\t", 123456])(
+    "rejects an invalid selected occurrence in an RCA success without retrying: %j",
+    async (sourceOccurrenceId) => {
+      fetchMock.mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            err: 0,
+            result: {
+              task_session_id: "new-session",
+              source_occurrence_id: sourceOccurrenceId,
+            },
+          }),
+        ),
+      );
+      await connect();
+      const result = await call("start-rca", {
+        project_slug: "example-project",
+        item_counter: 27024,
+      });
+      expect(result.isError).toBe(true);
+      expect(result.text).toContain("Invalid Rollbar API response");
+      expect(result.text).toContain("source occurrence ID");
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    },
+  );
 
   it.each(["true", 1, null])(
     "rejects non-boolean continuation: %j",
@@ -228,7 +368,7 @@ describe("agent task starts over MCP", () => {
 
   it.each(starts)(
     "uses file user credentials and API base for $kind without project discovery",
-    async ({ name, args }) => {
+    async ({ name, kind, args }) => {
       vi.stubEnv("ROLLBAR_CONFIG_FILE", "/test/rollbar.json");
       files.exists.mockImplementation(
         (path: string) => path === "/test/rollbar.json",
@@ -243,7 +383,9 @@ describe("agent task starts over MCP", () => {
           ],
         }),
       );
-      fetchMock.mockResolvedValueOnce(ok());
+      fetchMock.mockResolvedValueOnce(
+        ok("new-session", kind === "rca" ? "123456" : undefined),
+      );
       await connect();
       expect((await call(name, args)).isError).toBeFalsy();
       expect(fetchMock).toHaveBeenCalledTimes(1);
