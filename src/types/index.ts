@@ -7,6 +7,8 @@ export interface RollbarApiResponse<T> {
 
 export interface RollbarAgentTaskStartResponse {
   task_session_id: string;
+  /** Selected occurrence returned by RCA starts; absent for Resolve starts. */
+  source_occurrence_id?: string;
 }
 
 export interface RollbarResolveFeedbackResponse {

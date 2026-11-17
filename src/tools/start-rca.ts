@@ -1,5 +1,5 @@
-import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { startRcaParamsSchema } from "../utils/agent-task-params.js";
 import { startAgentTask } from "../utils/agent-tasks.js";
 
 export function registerStartRcaTool(server: McpServer) {
@@ -7,32 +7,18 @@ export function registerStartRcaTool(server: McpServer) {
     "start-rca",
     {
       description:
-        "Start an asynchronous root cause analysis (RCA) from a Rollbar occurrence ID, not an item ID or counter. Requires a configured user-scoped account token with write scope and project collab permission. Consumes credits and returns the new task_session_id, not the completed analysis. Do not automatically retry an uncertain result: this operation is not idempotent.",
-      inputSchema: {
-        source_occurrence_id: z
-          .string()
-          .refine(
-            (id) => id.trim().length > 0,
-            "Occurrence ID must not be blank",
-          )
-          .describe(
-            "Required occurrence ID as a string, not an item ID or counter. Pass the ID unchanged, including decimal or hexadecimal forms; never convert it to a number.",
-          ),
-        continue_with_resolve: z
-          .boolean()
-          .default(false)
-          .describe("Request Resolve after RCA completes. Defaults to false."),
-      },
+        "Start an asynchronous root cause analysis (RCA) using either source_occurrence_id or project_slug plus item_counter from the item URL, never both. For an item, Rollbar selects its latest occurrence at kickoff. Requires a configured user-scoped account token with write scope, collab permission on the source and correlated projects, and AI features enabled. Consumes credits and returns task_session_id plus the selected source_occurrence_id; use get-agent-task-status to check the run. Do not automatically retry an uncertain result: this operation is not idempotent.",
+      inputSchema: startRcaParamsSchema,
       annotations: {
         readOnlyHint: false,
         destructiveHint: false,
         idempotentHint: false,
       },
     },
-    async ({ source_occurrence_id, continue_with_resolve }) => {
+    async (params) => {
       const result = await startAgentTask({
         kind: "rca",
-        body: { source_occurrence_id, continue_with_resolve },
+        body: params,
       });
       return { content: [{ type: "text", text: JSON.stringify(result) }] };
     },

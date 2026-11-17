@@ -18,7 +18,7 @@ To read item history, post comments as yourself, or start, check and refine RCA 
 
 Use **read** scope for reads, or **read and write** to post comments. The MCP resolves your project through `GET /projects` (read scope), then posts with write scope. Your Rollbar user also needs **view** permission to read history and **comment** permission to post in that project. Project tokens and ordinary account tokens cannot post comments.
 
-`start-rca` and `start-resolve` require **write** scope and the user's **collab** permission on the relevant projects. They use occurrence/session IDs directly and do not call `GET /projects`, so they also work with a write-only user token and accounts with multiple projects. Project tokens and ordinary account-wide tokens cannot start these tasks.
+`start-rca` and `start-resolve` require **write** scope, the user's **collab** permission on the relevant projects, and AI features enabled for the account. They send the supplied identifiers directly without calling `GET /projects`, so they also work with a write-only user token and accounts with multiple projects. Project tokens and ordinary account-wide tokens cannot start these tasks.
 
 `get-agent-task-status` requires **read** scope and the user's **view** permission on the account and every project in the run. It uses the session ID directly without project discovery. Project tokens and ordinary account-wide tokens cannot read these runs. Configure a personal token with **read and write** scope to both start runs and check their results.
 
@@ -237,12 +237,29 @@ This needs write access: a project token with `write` scope, or an account/user 
 
 #### Start RCA and Resolve
 
-`start-rca(source_occurrence_id, continue_with_resolve?)`: Start an asynchronous root cause analysis through `POST /agent_tasks/rca`. `source_occurrence_id` must be an **occurrence ID**, not an item ID or counter, and must be supplied as a **string**. Pass decimal or hexadecimal IDs unchanged; converting them to JavaScript numbers can lose precision. `continue_with_resolve` defaults to `false`; set it to `true` to request Resolve after RCA.
+`start-rca`: Start an asynchronous root cause analysis through `POST /agent_tasks/rca` using exactly one of these forms:
+
+- `project_slug` and `item_counter`: The project slug and positive integer item number visible in the item URL. Rollbar selects the item's **latest occurrence at kickoff**.
+- `source_occurrence_id`: An **occurrence ID** supplied as a **string**, not an item ID or counter. Pass decimal or hexadecimal IDs unchanged; converting them to JavaScript numbers can lose precision.
+
+Do not mix these forms or supply only one of the item fields. Both forms accept optional `continue_with_resolve`, which defaults to `false`; set it to `true` to request Resolve after RCA. The token's user needs **collab** access to the source project and any correlated projects, and the account must have **AI features enabled**.
 
 Example `start-rca` arguments:
 
 ```json
-{ "source_occurrence_id": "123456", "continue_with_resolve": false }
+{ "project_slug": "olympus", "item_counter": 27024, "continue_with_resolve": false }
+```
+
+Or, for a specific occurrence:
+
+```json
+{ "source_occurrence_id": "123456789", "continue_with_resolve": false }
+```
+
+The RCA result includes the selected occurrence, even when started by item:
+
+```json
+{ "task_session_id": "<new RCA session ID>", "source_occurrence_id": "123456789" }
 ```
 
 `start-resolve(rca_task_session_id, initial_instructions?)`: Start Resolve through `POST /agent_tasks/resolve` using the session ID of a suitable **completed RCA run in the same account**. Optional `initial_instructions` extends the normal Resolve work, accepts up to **4,000 Unicode characters**, and is sent unchanged, including whitespace. An empty string is allowed.
@@ -256,9 +273,9 @@ Example `start-resolve` arguments, after that RCA run has completed:
 }
 ```
 
-Both tools return JSON text containing `{ "task_session_id": "<new task session ID>" }`. This confirms that a task started; it does not return the analysis or wait for completion. Neither tool takes a `project` argument: the backend derives the projects from the occurrence or RCA session and checks the connected user's permissions.
+Both tools return JSON text containing `task_session_id`; `start-rca` also returns `source_occurrence_id`. Use `task_session_id` with `get-agent-task-status`. A successful start does not return the analysis or wait for completion. Neither tool takes the general `project` argument: RCA accepts `project_slug` with `item_counter` or an occurrence ID, while Resolve uses the RCA session. The backend resolves these identifiers and checks the connected user's permissions.
 
-Starting tasks consumes credits. Both tools are non-idempotent writes and do not retry failures automatically. If a response is lost, check the task state in Rollbar before retrying. Backend error messages are preserved, including authentication/permissions (401/403), invalid input (400), unavailable RCA runs (404), active-task conflicts (409), and service validation such as insufficient credits (422).
+Starting tasks consumes credits. Both tools are non-idempotent writes and do not retry failures automatically. If a response is lost, check the task state in Rollbar before retrying. Backend error messages are preserved, including invalid or mixed identifiers (400), authentication/permissions or disabled AI features (401/403), unknown projects/items or unavailable RCA runs (404), active-task conflicts (409), and items without a usable occurrence or other service validation failures (422).
 
 #### Check RCA and Resolve status
 

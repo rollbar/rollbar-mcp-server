@@ -6,13 +6,14 @@ import type {
   RollbarResolveFeedbackResponse,
 } from "../types/index.js";
 import { AGENT_TASK_STATUSES } from "../types/index.js";
+import type { StartRcaParams } from "./agent-task-params.js";
 import { makeRollbarRequest } from "./api.js";
 import { getRollbarResult } from "./response.js";
 
 type AgentTaskStart =
   | {
       kind: "rca";
-      body: { source_occurrence_id: string; continue_with_resolve: boolean };
+      body: StartRcaParams;
     }
   | {
       kind: "resolve";
@@ -42,6 +43,15 @@ export async function startAgentTask(
     result.task_session_id.trim().length === 0
   ) {
     throw new Error("Invalid Rollbar API response: missing task session ID");
+  }
+  if (
+    request.kind === "rca" &&
+    (typeof result.source_occurrence_id !== "string" ||
+      result.source_occurrence_id.trim().length === 0)
+  ) {
+    throw new Error(
+      "Invalid Rollbar API response: missing source occurrence ID",
+    );
   }
   return result;
 }
