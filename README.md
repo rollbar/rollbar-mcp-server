@@ -247,7 +247,7 @@ Do not mix these forms or supply only one of the item fields. Both forms accept 
 Example `start-rca` arguments:
 
 ```json
-{ "project_slug": "olympus", "item_counter": 27024, "continue_with_resolve": false }
+{ "project_slug": "example-project", "item_counter": 27024, "continue_with_resolve": false }
 ```
 
 Or, for a specific occurrence:
@@ -256,11 +256,13 @@ Or, for a specific occurrence:
 { "source_occurrence_id": "123456789", "continue_with_resolve": false }
 ```
 
-The RCA result includes the selected occurrence, even when started by item:
+The updated RCA endpoint returns the selected occurrence, including when started by item:
 
 ```json
 { "task_session_id": "<new RCA session ID>", "source_occurrence_id": "123456789" }
 ```
+
+For compatibility with older API deployments, occurrence-ID starts also accept a response containing only `task_session_id`. Item-based starts require the selected `source_occurrence_id` in the response.
 
 `start-resolve(rca_task_session_id, initial_instructions?)`: Start Resolve through `POST /agent_tasks/resolve` using the session ID of a suitable **completed RCA run in the same account**. Optional `initial_instructions` extends the normal Resolve work, accepts up to **4,000 Unicode characters**, and is sent unchanged, including whitespace. An empty string is allowed.
 
@@ -273,7 +275,7 @@ Example `start-resolve` arguments, after that RCA run has completed:
 }
 ```
 
-Both tools return JSON text containing `task_session_id`; `start-rca` also returns `source_occurrence_id`. Use `task_session_id` with `get-agent-task-status`. A successful start does not return the analysis or wait for completion. Neither tool takes the general `project` argument: RCA accepts `project_slug` with `item_counter` or an occurrence ID, while Resolve uses the RCA session. The backend resolves these identifiers and checks the connected user's permissions.
+Both tools return JSON text containing `task_session_id`; `start-rca` also preserves `source_occurrence_id` when returned by the API. Use `task_session_id` with `get-agent-task-status`. A successful start does not return the analysis or wait for completion. Neither tool takes the general `project` argument: RCA accepts `project_slug` with `item_counter` or an occurrence ID, while Resolve uses the RCA session. The backend resolves these identifiers and checks the connected user's permissions.
 
 Starting tasks consumes credits. Both tools are non-idempotent writes and do not retry failures automatically. If a response is lost, check the task state in Rollbar before retrying. Backend error messages are preserved, including invalid or mixed identifiers (400), authentication/permissions or disabled AI features (401/403), unknown projects/items or unavailable RCA runs (404), active-task conflicts (409), and items without a usable occurrence or other service validation failures (422).
 

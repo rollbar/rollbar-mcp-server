@@ -19,7 +19,7 @@ const starts = [
   {
     name: "start-rca",
     kind: "rca",
-    args: { project_slug: "olympus", item_counter: 27024 },
+    args: { project_slug: "example-project", item_counter: 27024 },
   },
   {
     name: "start-resolve",
@@ -147,9 +147,48 @@ describe("agent task starts over MCP", () => {
     },
   );
 
+  it("accepts a legacy occurrence-based RCA success with only the task session ID", async () => {
+    fetchMock.mockResolvedValueOnce(ok("legacy-session"));
+    await connect();
+    const result = await call("start-rca", { source_occurrence_id: "123456" });
+    expect(result.isError).toBeFalsy();
+    expect(JSON.parse(result.text)).toEqual({
+      task_session_id: "legacy-session",
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({
+      source_occurrence_id: "123456",
+      continue_with_resolve: false,
+    });
+  });
+
+  it.each([null, "", " \n\t", 123456])(
+    "rejects a malformed occurrence ID when a legacy-form response includes it: %j",
+    async (sourceOccurrenceId) => {
+      fetchMock.mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            err: 0,
+            result: {
+              task_session_id: "new-session",
+              source_occurrence_id: sourceOccurrenceId,
+            },
+          }),
+        ),
+      );
+      await connect();
+      const result = await call("start-rca", {
+        source_occurrence_id: "123456",
+      });
+      expect(result.isError).toBe(true);
+      expect(result.text).toContain("source occurrence ID");
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    },
+  );
+
   describe.each([
     { source_occurrence_id: "123456" },
-    { project_slug: "olympus", item_counter: 27024 },
+    { project_slug: "example-project", item_counter: 27024 },
   ])("RCA source %j", (source) => {
     it.each([false, true])(
       "forwards explicit continue_with_resolve=%s",
@@ -230,13 +269,13 @@ describe("agent task starts over MCP", () => {
 
   it.each([
     {},
-    { project_slug: "olympus" },
+    { project_slug: "example-project" },
     { item_counter: 27024 },
-    { source_occurrence_id: "123456", project_slug: "olympus" },
+    { source_occurrence_id: "123456", project_slug: "example-project" },
     { source_occurrence_id: "123456", item_counter: 27024 },
     {
       source_occurrence_id: "123456",
-      project_slug: "olympus",
+      project_slug: "example-project",
       item_counter: 27024,
     },
   ])("rejects missing, incomplete or mixed RCA sources: %j", async (args) => {
@@ -265,7 +304,7 @@ describe("agent task starts over MCP", () => {
   ])("rejects invalid RCA item identifiers: %j", async (invalid) => {
     await connect();
     const result = await call("start-rca", {
-      project_slug: "olympus",
+      project_slug: "example-project",
       item_counter: 27024,
       ...invalid,
     });
@@ -290,7 +329,7 @@ describe("agent task starts over MCP", () => {
       );
       await connect();
       const result = await call("start-rca", {
-        project_slug: "olympus",
+        project_slug: "example-project",
         item_counter: 27024,
       });
       expect(result.isError).toBe(true);

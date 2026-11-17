@@ -44,8 +44,13 @@ export async function startAgentTask(
   ) {
     throw new Error("Invalid Rollbar API response: missing task session ID");
   }
-  if (
+  // Older APIs omit the selected occurrence on occurrence-ID starts.
+  const occurrenceIdExpected =
     request.kind === "rca" &&
+    (request.body.source_occurrence_id === undefined ||
+      result.source_occurrence_id !== undefined);
+  if (
+    occurrenceIdExpected &&
     (typeof result.source_occurrence_id !== "string" ||
       result.source_occurrence_id.trim().length === 0)
   ) {

@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-/** Identify exactly one RCA source; Mox selects the latest occurrence for an item. */
+/** Identify exactly one RCA source; the Rollbar API selects the item's latest occurrence. */
 export const startRcaParamsSchema = z
   .object({
     source_occurrence_id: z
