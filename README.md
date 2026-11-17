@@ -22,6 +22,8 @@ Use **read** scope for reads, or **read and write** to post comments. The MCP re
 
 `get-agent-task-status` requires **read** scope and the user's **view** permission on the account and every project in the run. It uses the session ID directly without project discovery. Project tokens and ordinary account-wide tokens cannot read these runs. Configure a personal token with **read and write** scope to both start runs and check their results.
 
+`list-agent-tasks` also requires a personal token with **read** scope and AI features enabled. Supply the project slug and item counter from the item URL. The user must be able to view that project; only runs whose associated projects are all visible to the user are returned.
+
 `send-resolve-feedback` requires **write** scope, **collab** permission on every project in the Resolve run, and AI features enabled for the account. It uses the existing run ID without project discovery. Use a personal token with **read and write** scope to submit feedback and then check progress.
 
 User mode sends every request with the configured user's token, including when per-project tokens are also present. Comment authorship comes from that token; you cannot supply a different author. The backend marks posted comments with `via_api: true` and handles normal subscriptions and notifications.
@@ -260,9 +262,37 @@ Both tools return JSON text containing `{ "task_session_id": "<new task session 
 
 Starting tasks consumes credits. Both tools are non-idempotent writes and do not retry failures automatically. If a response is lost, check the task state in Rollbar before retrying. Backend error messages are preserved, including authentication/permissions (401/403), invalid input (400), unavailable RCA runs (404), active-task conflicts (409), and service validation such as insufficient credits (422).
 
+#### Find RCA and Resolve runs for an item
+
+`list-agent-tasks(project_slug, item_counter, limit?, offset?)`: Read runs through `GET /agent_tasks` using the project slug and item number visible in the item URL. Both identifiers are required; `item_counter` is an integer from 1 to 4,294,967,295, not the global item ID. This is a read-only, idempotent tool with no general `project` argument or project discovery request.
+
+Example arguments:
+
+```json
+{ "project_slug": "example-project", "item_counter": 27024 }
+```
+
+The result is JSON text such as:
+
+```json
+{
+  "tasks": [
+    { "task_session_id": "8f4c2a...", "agent_type": "resolve", "status": "finished", "date_created": 1794910000 },
+    { "task_session_id": "7d3b1e...", "agent_type": "rca", "status": "finished", "date_created": 1794909000 }
+  ],
+  "next_offset": null
+}
+```
+
+Runs are ordered newest first; `date_created` is a Unix timestamp in **seconds**. Expired runs are omitted. A valid item with no visible runs returns an empty `tasks` array. Use any returned `task_session_id` with `get-agent-task-status`, or a **Resolve** run's ID with `send-resolve-feedback` (which requires write scope and collab access).
+
+Each call reads one page. Optional `limit` is 1–100 (default 50) and `offset` is 0–4,294,967,295 (default 0). Supply the response's `next_offset` as `offset` to continue; stop when it is `null` or absent. Permission filtering can produce a short or **empty page with a non-null `next_offset`**, so the length of `tasks` does not determine whether more pages exist. All additional result fields are preserved.
+
+The account needs AI features enabled, and the personal read token's user must be able to view the item's project and every project associated with a returned run. Invalid identifiers or pagination produce **400**, access or feature denial **403**, and an unknown project or item in the token's account **404**. Backend errors are reported as tool errors.
+
 #### Check RCA and Resolve status
 
-`get-agent-task-status(task_session_id)`: Read an RCA or Resolve run through `GET /agent_tasks/{task_session_id}`. Supply the session ID returned by `start-rca` or `start-resolve`, as a nonblank string. This is a read-only, idempotent tool with no `project` argument. It makes one request per call; call it again later to poll for completion.
+`get-agent-task-status(task_session_id)`: Read an RCA or Resolve run through `GET /agent_tasks/{task_session_id}`. Supply the session ID returned by `start-rca`, `start-resolve` or `list-agent-tasks`, as a nonblank string. This is a read-only, idempotent tool with no `project` argument. It makes one request per call; call it again later to poll for completion.
 
 Example arguments:
 
