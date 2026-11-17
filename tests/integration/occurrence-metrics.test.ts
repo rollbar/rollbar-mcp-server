@@ -6,7 +6,6 @@ import { CallToolResultSchema } from "@modelcontextprotocol/sdk/types.js";
 
 // Exercise the real MCP schemas, handler, auth, and HTTP client. Only the
 // configuration files and external Rollbar responses are replaced.
-vi.mock("dotenv", () => ({ default: { config: vi.fn() } }));
 vi.mock("node:fs", () => ({ existsSync: () => false, readFileSync: vi.fn() }));
 
 const apiBase = "https://rollbar.example/api/1";

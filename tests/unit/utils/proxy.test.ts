@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -14,9 +14,18 @@ vi.mock("undici", () => ({
 describe("proxy setup", () => {
   const originalEnv = process.env;
   const originalCwd = process.cwd();
+  let tempDir: string | undefined;
 
   beforeEach(() => {
     process.env = { ...originalEnv };
+    for (const name of [
+      "HTTPS_PROXY",
+      "HTTP_PROXY",
+      "https_proxy",
+      "http_proxy",
+    ]) {
+      delete process.env[name];
+    }
     vi.clearAllMocks();
     vi.resetModules();
   });
@@ -24,6 +33,8 @@ describe("proxy setup", () => {
   afterEach(() => {
     process.env = originalEnv;
     process.chdir(originalCwd);
+    if (tempDir) rmSync(tempDir, { recursive: true, force: true });
+    tempDir = undefined;
   });
 
   it("sets global dispatcher when HTTPS_PROXY is set", async () => {
@@ -80,8 +91,8 @@ describe("proxy setup", () => {
     expect(mockSetGlobalDispatcher).not.toHaveBeenCalled();
   });
 
-  it("honors proxy values loaded from .env before proxy setup runs", async () => {
-    const tempDir = mkdtempSync(path.join(tmpdir(), "rollbar-mcp-proxy-"));
+  it("does not load proxy values from a working-directory .env", async () => {
+    tempDir = mkdtempSync(path.join(tmpdir(), "rollbar-mcp-proxy-"));
 
     writeFileSync(
       path.join(tempDir, ".env"),
@@ -89,10 +100,6 @@ describe("proxy setup", () => {
     );
 
     process.chdir(tempDir);
-    process.env = {
-      ...originalEnv,
-      HOME: tempDir,
-    };
     delete process.env.ROLLBAR_ACCESS_TOKEN;
     delete process.env.ROLLBAR_CONFIG_FILE;
     delete process.env.HTTPS_PROXY;
@@ -100,12 +107,9 @@ describe("proxy setup", () => {
     delete process.env.https_proxy;
     delete process.env.http_proxy;
 
-    await import("../../../src/load-env.js");
     await import("../../../src/utils/proxy.js");
 
-    expect(mockProxyAgentConstructor).toHaveBeenCalledWith(
-      "http://proxy.example.com:8080",
-    );
-    expect(mockSetGlobalDispatcher).toHaveBeenCalledTimes(1);
+    expect(mockProxyAgentConstructor).not.toHaveBeenCalled();
+    expect(mockSetGlobalDispatcher).not.toHaveBeenCalled();
   });
 });

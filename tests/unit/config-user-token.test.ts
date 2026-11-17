@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("dotenv", () => ({ default: { config: vi.fn() } }));
 const files = vi.hoisted(() => ({ exists: vi.fn(), read: vi.fn() }));
 vi.mock("node:fs", () => ({
   existsSync: files.exists,
@@ -98,14 +97,15 @@ describe("connected-user authentication", () => {
     },
   );
 
-  it.each(["cwd", "home"])(
+  it.each(["explicit", "home"])(
     "loads the user token from the %s config fallback",
     async (location) => {
       const { homedir } = await import("node:os");
       const path =
-        location === "cwd"
+        location === "explicit"
           ? `${process.cwd()}/.rollbar-mcp.json`
           : `${homedir()}/.rollbar-mcp.json`;
+      if (location === "explicit") vi.stubEnv("ROLLBAR_CONFIG_FILE", path);
       files.exists.mockImplementation((name: string) => name === path);
       files.read.mockReturnValue(JSON.stringify({ userToken: "file-user" }));
       const { resolveAuthContext } = await import("../../src/config.js");
@@ -117,13 +117,13 @@ describe("connected-user authentication", () => {
     },
   );
 
-  it("applies a user environment token to a project-token config", async () => {
+  it("keeps a selected project-token config independent of environment user tokens", async () => {
     configFile({ projects: [{ name: "Backend", token: "project-secret" }] });
     vi.stubEnv("ROLLBAR_USER_ACCESS_TOKEN", "env-user");
     const { resolveAuthContext } = await import("../../src/config.js");
     expect(await resolveAuthContext("Backend")).toMatchObject({
-      token: "env-user",
-      tokenType: "user",
+      token: "project-secret",
+      tokenType: "project",
     });
   });
 
@@ -136,20 +136,17 @@ describe("connected-user authentication", () => {
     });
   });
 
-  it.each(["env", "file", "mixed"])(
+  it.each(["env", "file"])(
     "rejects simultaneous account and user tokens from %s",
     async (source) => {
       if (source === "env") {
         vi.stubEnv("ROLLBAR_ACCOUNT_ACCESS_TOKEN", "account-secret");
         vi.stubEnv("ROLLBAR_USER_ACCESS_TOKEN", "user-secret");
-      } else if (source === "file") {
+      } else {
         configFile({
           accountToken: "account-secret",
           userToken: "user-secret",
         });
-      } else {
-        configFile({ accountToken: "account-secret" });
-        vi.stubEnv("ROLLBAR_USER_ACCESS_TOKEN", "user-secret");
       }
       await import("../../src/config.js");
       expect(process.exit).toHaveBeenCalledWith(1);

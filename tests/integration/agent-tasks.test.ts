@@ -6,7 +6,6 @@ import { CallToolResultSchema } from "@modelcontextprotocol/sdk/types.js";
 
 // Keep MCP validation, configuration, handlers and HTTP handling real.
 // Replace only configuration files and the external Rollbar HTTP boundary.
-vi.mock("dotenv", () => ({ default: { config: vi.fn() } }));
 const files = vi.hoisted(() => ({ exists: vi.fn(), read: vi.fn() }));
 vi.mock("node:fs", () => ({
   existsSync: files.exists,
@@ -376,7 +375,7 @@ describe("agent task starts over MCP", () => {
       files.read.mockReturnValue(
         JSON.stringify({
           userToken: "file-user-token",
-          apiBase: "https://staging.example/api/1/",
+          apiBase: "https://api-staging.rollbardev.com/api/1/",
           projects: [
             { name: "Backend", token: "project-token-1" },
             { name: "Frontend", token: "project-token-2" },
@@ -390,7 +389,7 @@ describe("agent task starts over MCP", () => {
       expect((await call(name, args)).isError).toBeFalsy();
       expect(fetchMock).toHaveBeenCalledTimes(1);
       expect(fetchMock.mock.calls[0][0]).toMatch(
-        /^https:\/\/staging.example\/api\/1\/agent_tasks\//,
+        /^https:\/\/api-staging\.rollbardev\.com\/api\/1\/agent_tasks\//,
       );
       expect(fetchMock.mock.calls[0][1].headers["X-Rollbar-Access-Token"]).toBe(
         "file-user-token",

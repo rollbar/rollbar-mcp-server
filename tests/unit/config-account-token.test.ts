@@ -1,11 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
-vi.mock("dotenv", () => ({
-  default: {
-    config: vi.fn(),
-  },
-}));
-
 const existsSyncMock = vi.fn();
 const readFileSyncMock = vi.fn();
 vi.mock("node:fs", () => ({

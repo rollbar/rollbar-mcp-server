@@ -6,14 +6,13 @@ import { CallToolResultSchema } from "@modelcontextprotocol/sdk/types.js";
 
 // Keep config, project discovery, and both replay handlers real. Only the
 // local config file and external API are replaced.
-vi.mock("dotenv", () => ({ default: { config: vi.fn() } }));
 const files = vi.hoisted(() => ({ exists: vi.fn(), read: vi.fn() }));
 vi.mock("node:fs", () => ({
   existsSync: files.exists,
   readFileSync: files.read,
 }));
 
-const apiBase = "https://rollbar.example/api/1";
+const apiBase = "https://api.rollbar.com/api/1";
 const project = { id: 456, name: "Backend", status: "enabled" };
 const projectTokens = [
   { name: "Backend", token: "project-token" },
@@ -92,7 +91,7 @@ describe("replay resource access with real authentication", () => {
     await client.connect(clientTransport);
   }
 
-  it.each(["environment", "shorthand", "projects", "mixed"])(
+  it.each(["environment", "shorthand", "projects"])(
     "allows both replay entry points for one user project with ignored %s project tokens",
     async (source) => {
       if (source === "environment") {
@@ -100,11 +99,8 @@ describe("replay resource access with real authentication", () => {
         vi.stubEnv("ROLLBAR_ACCESS_TOKEN", "project-token");
       } else if (source === "shorthand") {
         configFile({ userToken: "user-token", token: "project-token" });
-      } else if (source === "projects") {
-        configFile({ userToken: "user-token", projects: projectTokens });
       } else {
-        configFile({ projects: projectTokens });
-        vi.stubEnv("ROLLBAR_USER_ACCESS_TOKEN", "user-token");
+        configFile({ userToken: "user-token", projects: projectTokens });
       }
       await connect();
 
@@ -135,14 +131,17 @@ describe("replay resource access with real authentication", () => {
     },
   );
 
-  it.each(["user", "account"])(
+  it.each(["user", "account", "project-file"])(
     "rejects both replay entry points when %s mode can actually reach multiple projects",
     async (mode) => {
       if (mode === "user") {
         configFile({ userToken: "user-token", projects: projectTokens });
         visibleProjects.push({ id: 789, name: "Other", status: "enabled" });
-      } else {
+      } else if (mode === "account") {
         configFile({ accountToken: "account-token", projects: projectTokens });
+      } else {
+        configFile({ projects: projectTokens });
+        vi.stubEnv("ROLLBAR_USER_ACCESS_TOKEN", "ignored-env-user");
       }
       await connect();
 
@@ -152,7 +151,10 @@ describe("replay resource access with real authentication", () => {
       const result = CallToolResultSchema.parse(
         await client.callTool({
           name: "get-replay",
-          arguments: { ...replayArgs, project: "456" },
+          arguments: {
+            ...replayArgs,
+            project: mode === "project-file" ? "Backend" : "456",
+          },
         }),
       );
       expect(result.isError).toBe(true);
@@ -164,9 +166,9 @@ describe("replay resource access with real authentication", () => {
           ),
         }),
       );
-      expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
-        `${apiBase}/projects`,
-      ]);
+      expect(fetchMock.mock.calls.map(([url]) => url)).toEqual(
+        mode === "project-file" ? [] : [`${apiBase}/projects`],
+      );
     },
   );
 });

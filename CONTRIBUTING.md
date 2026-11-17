@@ -17,7 +17,7 @@ You can run the server directly to confirm it starts (it will wait for stdin; Ct
 node build/index.js
 ```
 
-For local development, configure Rollbar either with an environment variable or a config file. Create `.rollbar-mcp.json` in the project root (or set `ROLLBAR_CONFIG_FILE` to its path) for single- or multi-project config—see the README Configuration section.
+For local development, configure Rollbar through environment variables in your MCP client or a config file. Use `~/.rollbar-mcp.json`, or explicitly select a file with `ROLLBAR_CONFIG_FILE`. Files in the working directory are not loaded automatically—see the README Configuration section.
 
 ### Run your local installation from Claude Code
 
@@ -38,7 +38,7 @@ In your Claude Code MCP config (e.g. `.mcp.json`):
 }
 ```
 
-To use a config file instead, set `"ROLLBAR_CONFIG_FILE": "/path/to/.rollbar-mcp.json"` in `env` (or omit it if `.rollbar-mcp.json` is in the project root or your home directory). Add `ROLLBAR_API_BASE` to `env` if you need a custom Rollbar API endpoint (e.g. `"ROLLBAR_API_BASE": "https://rollbar-dev.example.com/api/1"`).
+To use a config file instead, set `"ROLLBAR_CONFIG_FILE": "/path/to/.rollbar-mcp.json"` in `env` (or omit it to use `~/.rollbar-mcp.json`). Explicit paths must be absolute or start with `~/`, which is expanded from your home directory. Keep all tokens and the endpoint in the same configuration source. Files support HTTPS endpoints on `rollbar.com` subdomains, `api-staging.rollbardev.com`, and `devNN-moxapi.rollbar.dev` (two digits), plus HTTP(S) on `localhost`, `127.0.0.1` or `::1`. Other custom HTTPS endpoints require environment-only configuration: supply the token and `ROLLBAR_API_BASE` in `env` and ensure no config file is selected or present in your home directory.
 
 ### Run your local installation from your IDE
 
@@ -92,7 +92,7 @@ You can use `ROLLBAR_CONFIG_FILE` in `env` instead of `ROLLBAR_ACCESS_TOKEN` for
 
 Build with `npm run build`, then set these environment variables before running the script:
 
-- `ROLLBAR_E2E_CONFIG_FILE`: absolute path to a local MCP config containing `userToken` (read and write scope), and `apiBase` if using staging. Do not commit this file.
+- `ROLLBAR_E2E_CONFIG_FILE`: absolute path to a local MCP config containing `userToken` (read and write scope), and `apiBase` if using staging (for example, `https://api-staging.rollbardev.com/api/1`) or local development. Do not commit this file.
 - `ROLLBAR_E2E_PROJECT`: the test project's name or numeric ID.
 - `ROLLBAR_E2E_ITEM_ID`: the test item's global ID, not its counter.
 - `ROLLBAR_E2E_USER_ID`: the expected token owner's numeric Rollbar user ID.
