@@ -10,7 +10,7 @@ export function registerGetAgentTaskStatusTool(server: McpServer) {
         "Get the current status and available results of an RCA or Resolve run by task_session_id. Requires a personal account token with read scope, view access to the account and every project in the run, and AI features enabled. Status is queued, running, blocked, canceling, finished, failed, or canceled. Finished runs include RCA analysis or Resolve output with the pull request URL when available; failed runs may include failure_reason. Makes one read-only request; call again later to check progress.",
       inputSchema: {
         task_session_id: taskSessionIdSchema.describe(
-          "The task_session_id returned by start-rca or start-resolve; not an item or occurrence ID.",
+          "The task_session_id returned by start-rca, start-resolve or list-agent-tasks; not an item or occurrence ID.",
         ),
       },
       annotations: {

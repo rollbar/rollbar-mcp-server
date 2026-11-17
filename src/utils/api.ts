@@ -20,7 +20,10 @@ function buildAuthErrorHint(
   }
 
   if (status === 403) {
-    if (toolName === "get-agent-task-status") {
+    if (
+      toolName === "get-agent-task-status" ||
+      toolName === "list-agent-tasks"
+    ) {
       return "Reading agent tasks requires a personal account token with read scope, view access to the account and every project in the run, and AI features enabled for the account. Configure userToken / ROLLBAR_USER_ACCESS_TOKEN; project and account-wide tokens cannot read agent tasks.";
     }
     if (toolName === "send-resolve-feedback") {
