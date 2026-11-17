@@ -14,7 +14,7 @@ vi.mock("node:fs", () => ({
 
 const apiBase = "https://rollbar.example/api/1";
 const toolName = "list-agent-tasks";
-const item = { project_slug: "olympus", item_counter: 27024 };
+const item = { project_slug: "example-project", item_counter: 27024 };
 const run = {
   task_session_id: "resolve-session",
   agent_type: "resolve",
@@ -121,7 +121,7 @@ describe("agent task discovery over MCP", () => {
     expect(result.isError).toBeFalsy();
     expect(JSON.parse(result.text)).toEqual(payload);
     expect(fetchMock).toHaveBeenCalledExactlyOnceWith(
-      `${apiBase}/agent_tasks?project_slug=olympus&item_counter=27024`,
+      `${apiBase}/agent_tasks?project_slug=example-project&item_counter=27024`,
       {
         method: "GET",
         headers: {
@@ -159,7 +159,7 @@ describe("agent task discovery over MCP", () => {
       expect(JSON.parse(result.text)).toEqual(payload);
       expect(fetchMock).toHaveBeenCalledTimes(1);
       expect(fetchMock.mock.calls[0][0]).toBe(
-        `${apiBase}/agent_tasks?project_slug=olympus&item_counter=27024&limit=2&offset=10`,
+        `${apiBase}/agent_tasks?project_slug=example-project&item_counter=27024&limit=2&offset=10`,
       );
     },
   );
@@ -172,7 +172,7 @@ describe("agent task discovery over MCP", () => {
     await connect();
     expect((await call({ ...item, ...args })).isError).toBeFalsy();
     expect(fetchMock.mock.calls[0][0]).toBe(
-      `${apiBase}/agent_tasks?project_slug=olympus&item_counter=${args.item_counter}&limit=${args.limit}&offset=${args.offset}`,
+      `${apiBase}/agent_tasks?project_slug=example-project&item_counter=${args.item_counter}&limit=${args.limit}&offset=${args.offset}`,
     );
   });
 
@@ -222,7 +222,7 @@ describe("agent task discovery over MCP", () => {
     expect((await call()).isError).toBeFalsy();
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock.mock.calls[0][0]).toBe(
-      "http://local-api.invalid/api/1/agent_tasks?project_slug=olympus&item_counter=27024",
+      "http://local-api.invalid/api/1/agent_tasks?project_slug=example-project&item_counter=27024",
     );
     expect(fetchMock.mock.calls[0][1].headers["X-Rollbar-Access-Token"]).toBe(
       "file-personal-token",

@@ -269,7 +269,7 @@ Starting tasks consumes credits. Both tools are non-idempotent writes and do not
 Example arguments:
 
 ```json
-{ "project_slug": "olympus", "item_counter": 27024 }
+{ "project_slug": "example-project", "item_counter": 27024 }
 ```
 
 The result is JSON text such as:
