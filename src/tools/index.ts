@@ -14,6 +14,7 @@ import { registerGetMetricsTool } from "./get-metrics.js";
 import { registerStartRcaTool } from "./start-rca.js";
 import { registerStartResolveTool } from "./start-resolve.js";
 import { registerGetAgentTaskStatusTool } from "./get-agent-task-status.js";
+import { registerListAgentTasksTool } from "./list-agent-tasks.js";
 import { registerSendResolveFeedbackTool } from "./send-resolve-feedback.js";
 
 export function registerAllTools(server: McpServer) {
@@ -32,5 +33,6 @@ export function registerAllTools(server: McpServer) {
   registerStartRcaTool(server);
   registerStartResolveTool(server);
   registerGetAgentTaskStatusTool(server);
+  registerListAgentTasksTool(server);
   registerSendResolveFeedbackTool(server);
 }

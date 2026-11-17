@@ -26,10 +26,26 @@ export const AGENT_TASK_STATUSES = [
   "canceled",
 ] as const;
 
-export interface RollbarAgentTaskStatusResponse {
+export interface RollbarAgentTaskState {
   task_session_id: string;
   agent_type: "rca" | "resolve";
   status: (typeof AGENT_TASK_STATUSES)[number];
+}
+
+export interface RollbarAgentTaskSummary extends RollbarAgentTaskState {
+  /** Unix timestamp in seconds. */
+  date_created: number;
+  [key: string]: unknown;
+}
+
+export interface RollbarAgentTaskListResponse {
+  tasks: RollbarAgentTaskSummary[];
+  /** May be present even when permissions leave this page with no visible tasks. */
+  next_offset?: number | null;
+  [key: string]: unknown;
+}
+
+export interface RollbarAgentTaskStatusResponse extends RollbarAgentTaskState {
   rca_results?: {
     results?: { root_cause?: string | null; [key: string]: unknown };
     [key: string]: unknown;
